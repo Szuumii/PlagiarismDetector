@@ -1,0 +1,29 @@
+{
+  "name": "@repo/llm-clients",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "@repo/schemas": "*",
+    "zod-to-json-schema": "^3.23.0"
+  },
+  "devDependencies": {
+    "@repo/config": "*",
+    "typescript": "^5.5.0"
+  }
+}

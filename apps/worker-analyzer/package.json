@@ -1,0 +1,25 @@
+{
+  "name": "worker-analyzer",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@repo/core": "*",
+    "@repo/db": "*",
+    "@repo/llm-clients": "*",
+    "@repo/schemas": "*",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.4.0"
+  },
+  "devDependencies": {
+    "@repo/config": "*",
+    "tsx": "^4.15.0",
+    "typescript": "^5.5.0"
+  }
+}

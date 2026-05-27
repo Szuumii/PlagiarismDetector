@@ -1,0 +1,35 @@
+{
+  "name": "api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/router.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@fastify/compress": "^7.0.0",
+    "@fastify/cors": "^9.0.0",
+    "@fastify/static": "^7.0.0",
+    "@repo/db": "*",
+    "@repo/schemas": "*",
+    "@trpc/server": "^11.0.0",
+    "bullmq": "^5.0.0",
+    "fastify": "^4.28.0",
+    "ioredis": "^5.4.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@repo/config": "*",
+    "tsx": "^4.15.0",
+    "typescript": "^5.5.0"
+  }
+}
