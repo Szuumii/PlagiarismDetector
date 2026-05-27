@@ -4,6 +4,11 @@
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noEmit": true,
+    // web is a no-emit app (Vite bundles it); it never produces a .d.ts, so
+    // turn off the base config's declaration emit. Without this, the tRPC
+    // client's inferred type trips TS2742 ("cannot be named… not portable").
+    "declaration": false,
+    "declarationMap": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]

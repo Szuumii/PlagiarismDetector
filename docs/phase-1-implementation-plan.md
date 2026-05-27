@@ -20,15 +20,17 @@ Milestones are sized to map onto individual Claude-assisted coding sessions. Eac
 
 The riskiest "boring" milestone. The whole architecture rests on the `AppRouter` type flowing api → web cleanly and on the Prisma client being generated before dependents build.
 
-> **Progress — verified 2026-05-27: IN PROGRESS.** Structural skeleton + build tooling are in place (workspaces, `turbo.json`, `packages/config`, per-package tsdown/tsconfig; ESM decided — `type: module` across all 9 workspaces). The **type spine itself is still stubbed**: `packages/schemas` is `export {}`, `apps/api`'s router is `export type AppRouter = never`, `apps/web` renders a static `<div>` (no tRPC client / `health.ping`). `packages/db` now has a starter `Org` model (the tenancy root) so `prisma generate` succeeds — the full Phase 1 model set still lands in M1. One gap inside the done items — `db:generate` isn't wired as a `turbo` build prerequisite (`prisma generate` is inlined in `@repo/db`'s `build` script instead). **Exit criteria:** `npx turbo build` now passes cold (8/8 tasks); the remaining criteria (web fetching a value over tRPC with end-to-end inference) stay unmet while the spine is stubbed.
+> **Progress — updated 2026-05-27: M0 COMPLETE (type spine wired).** All three exit criteria pass: (1) `npx turbo build` succeeds cold (8/8); (2) web fetches `health.ping` over tRPC with end-to-end inference — verified by curl (`{"ok":true,"ts":…}`) and a rename test (renaming the api procedure breaks web's typecheck with TS2339); (3) the web production bundle contains zero server code (no fastify / @trpc/server / PrismaClient / initTRPC / bullmq / ioredis). `packages/schemas` exports real Zod schemas (`VerdictSchema`, `IndexDocumentJobSchema`, `AnalyzeSuspectJobSchema`); `apps/api` runs Fastify 5 + tRPC (`fastifyTRPCPlugin`); `apps/web` uses `@trpc/react-query` + TanStack Query. `apps/web/tsconfig.json` sets `declaration: false` (no-emit app) to dodge TS2742 on the inferred tRPC client type.
+>
+> **Deferred to M1 (not part of M0's exit criteria):** the full Prisma model set — only the `Org` tenancy root + the `db` singleton client exist so far — plus wiring `DATABASE_URL` and the default `orgId` into the tRPC context. Minor: `db:generate` is inlined in `@repo/db`'s build script rather than wired as a `turbo` prerequisite.
 
 **Tasks**
 - [x] Root `package.json` with npm `workspaces: ["apps/*", "packages/*"]` + `turbo.json` with tasks: `build`, `dev`, `lint`, `typecheck`, `db:generate`. Wire `db:generate` and package `^build` as prerequisites so the Prisma client and built packages exist before dependents compile. (Turborepo runs on top of npm; no `pnpm-workspace.yaml`.)
 - [x] `packages/config`: shared `tsconfig.base.json`, eslint, prettier. **Decide ESM now**: `"type": "module"` everywhere, `moduleResolution: "NodeNext"` (packages/apps) or `"Bundler"` (web), `isolatedModules: true`. Retrofitting ESM later is painful (unpdf is ESM-only; BullMQ/Fastify/tRPC v11 prefer ESM).
-- [ ] `packages/schemas`: real exports even if minimal — `VerdictSchema`, `IndexDocumentJobSchema`, `AnalyzeSuspectJobSchema`. **All shared runtime contracts live here**, never in `apps/api`.
+- [x] `packages/schemas`: real exports even if minimal — `VerdictSchema`, `IndexDocumentJobSchema`, `AnalyzeSuspectJobSchema`. **All shared runtime contracts live here**, never in `apps/api`.
 - [ ] `packages/db`: Prisma schema with all models (see M1 for the pgvector detail); `postinstall` runs `prisma generate`.
-- [ ] `apps/api`: Fastify + trivial tRPC router (`health.ping`). Export **only the type**: `export type { AppRouter }` from a dedicated `src/router.ts`.
-- [ ] `apps/web`: Vite + React + tRPC client that calls `health.ping` and renders it. Depend on api via `"api": "*"` (npm workspaces resolve by name; no `workspace:` protocol) but consume types from source via `import type`.
+- [x] `apps/api`: Fastify + trivial tRPC router (`health.ping`). Export **only the type**: `export type { AppRouter }` from a dedicated `src/router.ts`.
+- [x] `apps/web`: Vite + React + tRPC client that calls `health.ping` and renders it. Depend on api via `"api": "*"` (npm workspaces resolve by name; no `workspace:` protocol) but consume types from source via `import type`.
 
 **Exit criteria**
 - `npm install && npx turbo build` succeeds cold.
