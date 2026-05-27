@@ -1,4 +1,7 @@
-// Prisma schema — models defined in M1
+// Prisma schema — full Phase 1 model set lands in M1.
+// Org is the starter model: the multi-tenancy root (Phase 1 hardcodes a single
+// default org). Every model added later carries orgId — see "Cross-cutting
+// decisions" in docs/phase-1-implementation-plan.md.
 
 generator client {
   provider        = "prisma-client-js"
@@ -9,4 +12,12 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   extensions = [vector]
+}
+
+model Org {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
