@@ -16,14 +16,14 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@fastify/compress": "^7.0.0",
-    "@fastify/cors": "^9.0.0",
-    "@fastify/static": "^7.0.0",
+    "@fastify/compress": "^8.0.0",
+    "@fastify/cors": "^11.0.0",
+    "@fastify/static": "^9.0.0",
     "@repo/db": "*",
     "@repo/schemas": "*",
     "@trpc/server": "^11.0.0",
     "bullmq": "^5.0.0",
-    "fastify": "^4.28.0",
+    "fastify": "^5.8.5",
     "ioredis": "^5.4.0",
     "zod": "^3.23.0"
   },
