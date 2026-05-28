@@ -1,7 +1,8 @@
-// Prisma schema — full Phase 1 model set lands in M1.
-// Org is the starter model: the multi-tenancy root (Phase 1 hardcodes a single
-// default org). Every model added later carries orgId — see "Cross-cutting
-// decisions" in docs/phase-1-implementation-plan.md.
+// Multi-tenant from day 1: every row carries orgId. Phase 1 hardcodes a single
+// default org. See "Cross-cutting decisions" in docs/phase-1-implementation-plan.md.
+//
+// Vector column is Unsupported("vector(1024)") — not readable/writable through
+// the typed Prisma client; all vector I/O uses raw SQL.
 
 generator client {
   provider        = "prisma-client-js"
@@ -13,10 +14,175 @@ datasource db {
   extensions = [vector]
 }
 
+enum DocumentStatus {
+  pending
+  parsing
+  embedding
+  indexed
+  failed
+}
+
+enum AnalysisStatus {
+  pending
+  parsing
+  searching
+  judging
+  done
+  failed
+}
+
+enum SuspectStatus {
+  pending
+  uploaded
+  failed
+}
+
+enum VerdictLabel {
+  plagiarism
+  paraphrase
+  no_match
+}
+
 model Org {
   id        String   @id @default(uuid())
   name      String
   slug      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  libraries  Library[]
+  documents  Document[]
+  chunks     Chunk[]
+  embeddings Embedding[]
+  suspects   Suspect[]
+  analyses   AnalysisJob[]
+  verdicts   Verdict[]
+}
+
+model Library {
+  id        String   @id @default(uuid())
+  orgId     String
+  name      String
+  createdAt DateTime @default(now())
+
+  org       Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  documents Document[]
+
+  @@index([orgId])
+}
+
+model Document {
+  id          String         @id @default(uuid())
+  orgId       String
+  libraryId   String
+  title       String
+  filename    String
+  s3Key       String
+  status      DocumentStatus @default(pending)
+  contentHash String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  org      Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  library  Library   @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  chunks   Chunk[]
+  verdicts Verdict[]
+
+  @@unique([orgId, contentHash])
+  @@index([orgId, libraryId])
+}
+
+model Chunk {
+  id          String @id @default(uuid())
+  orgId       String
+  documentId  String
+  chunkIdx    Int
+  content     String
+  contentHash String
+
+  org       Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  document  Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  embedding Embedding?
+
+  @@unique([documentId, chunkIdx])
+  @@unique([orgId, contentHash])
+  @@index([orgId, documentId])
+}
+
+model Embedding {
+  id      String                      @id @default(uuid())
+  orgId   String
+  chunkId String                      @unique
+  vector  Unsupported("vector(1024)")
+  model   String
+
+  org   Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  chunk Chunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+model Suspect {
+  id        String        @id @default(uuid())
+  orgId     String
+  filename  String
+  s3Key     String
+  status    SuspectStatus @default(pending)
+  createdAt DateTime      @default(now())
+
+  org      Org           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  analyses AnalysisJob[]
+
+  @@index([orgId])
+}
+
+model AnalysisJob {
+  id          String         @id @default(uuid())
+  orgId       String
+  suspectId   String
+  status      AnalysisStatus @default(pending)
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+
+  org      Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  suspect  Suspect   @relation(fields: [suspectId], references: [id], onDelete: Cascade)
+  verdicts Verdict[]
+
+  @@index([orgId])
+  @@index([suspectId])
+}
+
+model Verdict {
+  id             String       @id @default(uuid())
+  orgId          String
+  analysisJobId  String
+  candidateDocId String
+  label          VerdictLabel
+  confidence     Float
+  reasoning      String
+  searchScore    Float
+  createdAt      DateTime     @default(now())
+
+  org          Org            @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  analysisJob  AnalysisJob    @relation(fields: [analysisJobId], references: [id], onDelete: Cascade)
+  candidateDoc Document       @relation(fields: [candidateDocId], references: [id], onDelete: Cascade)
+  evidence     EvidencePair[]
+
+  @@unique([analysisJobId, candidateDocId])
+  @@index([orgId, analysisJobId])
+}
+
+model EvidencePair {
+  id          String @id @default(uuid())
+  verdictId   String
+  pairIndex   Int
+  suspectText String
+  sourceText  String
+  note        String
+
+  verdict Verdict @relation(fields: [verdictId], references: [id], onDelete: Cascade)
+
+  @@unique([verdictId, pairIndex])
 }
