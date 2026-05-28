@@ -1,16 +1,19 @@
-.PHONY: start-dev up down logs db-generate db-migrate db-studio clean install
+.PHONY: start-dev start-dev-docker up down logs db-generate db-migrate db-studio clean install
 
 # Bring up infra (postgres + redis), ensure the Prisma client and package
 # builds exist, then run the api + web dev servers in the foreground.
 start-dev: .env node_modules
-	docker compose up -d --wait
+	docker compose up -d --wait postgres redis
 	npx turbo build --filter='./packages/*'
 	set -a; . ./.env; set +a; npm run dev
+
+start-dev-docker: .env ## start full stack (api + web + infra) in docker
+	docker compose up --build
 
 # --- infra lifecycle ---------------------------------------------------------
 
 up: ## start infra containers (postgres, redis) and wait until healthy
-	docker compose up -d --wait
+	docker compose up -d --wait postgres redis
 
 down: ## stop infra containers (data preserved)
 	docker compose down

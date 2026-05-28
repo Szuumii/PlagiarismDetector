@@ -11,7 +11,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/trpc": "http://localhost:3001",
+      "/trpc": process.env.API_URL ?? "http://localhost:3001",
     },
   },
 });

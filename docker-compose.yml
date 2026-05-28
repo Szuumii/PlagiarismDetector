@@ -25,7 +25,49 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: >
+      sh -c "npm install &&
+             npx turbo build --filter='./packages/*' &&
+             npm run dev -w api"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/plagiarism_detector
+      REDIS_URL: redis://redis:6379
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    volumes:
+      - .:/repo
+      - api_node_modules:/repo/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: >
+      sh -c "npm install &&
+             npm run dev -w web -- --host 0.0.0.0"
+    environment:
+      API_URL: http://api:3001
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/repo
+      - web_node_modules:/repo/node_modules
+    depends_on:
+      - api
+
 # MinIO will be added here in a later M1 step.
 
 volumes:
   pgdata:
+  api_node_modules:
+  web_node_modules:
