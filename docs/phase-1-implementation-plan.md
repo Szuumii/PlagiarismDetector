@@ -45,10 +45,10 @@ The riskiest "boring" milestone. The whole architecture rests on the `AppRouter`
 
 **Tasks**
 - [ ] `docker-compose.yml` with `postgres` (pgvector image), `redis`, `minio`. **Hold off containerizing api/workers/web until M5** — run them on the host against composed infra for fast iteration.
-- [ ] Prisma: `previewFeatures = ["postgresqlExtensions"]`, `extensions = [vector]` on the datasource. Verify the first migration emits `CREATE EXTENSION IF NOT EXISTS vector`.
-- [ ] Model the vector column as `Unsupported("vector(1024)")` on `Embedding` (Prisma has no native vector type — it is *not* readable/writable through the typed client; all vector I/O is raw SQL).
-- [ ] `packages/llm-clients`: `voyage.ts` + `anthropic.ts` as **typed stubs** (real signatures, deterministic fake output).
-- [ ] `packages/core/vector-index.ts`: `searchVector(orgId, libraryId, queryEmbedding, k)` stub returning `[]`.
+- [x] Prisma: `previewFeatures = ["postgresqlExtensions"]`, `extensions = [vector]` on the datasource. Verify the first migration emits `CREATE EXTENSION IF NOT EXISTS vector`.
+- [x] Model the vector column as `Unsupported("vector(1024)")` on `Embedding` (Prisma has no native vector type — it is *not* readable/writable through the typed client; all vector I/O is raw SQL).
+- [x] `packages/llm-clients`: `voyage.ts` + `anthropic.ts` as **typed stubs** (real signatures, deterministic fake output).
+- [x] `packages/core/vector-index.ts`: `searchVector(orgId, libraryId, queryEmbedding, k)` stub returning `[]`.
 - [ ] MinIO bucket bootstrap: a one-shot `mc mb` init sidecar or create-on-startup in the API (first upload 404s otherwise).
 
 **Exit criteria**
