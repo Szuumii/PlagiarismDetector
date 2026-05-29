@@ -17,7 +17,7 @@ Academic plagiarism detection pipeline built on TypeScript. Upload reference PDF
 | Frontend | React + Vite + React Router |
 | Queue | BullMQ + Redis |
 | Database | Postgres + pgvector (Prisma) |
-| Object storage | SeaweedFS (S3-compatible) |
+| Object storage | AWS S3 |
 | Embeddings | Voyage `voyage-3-large` |
 | Judge | Anthropic Claude (tool-use) |
 
@@ -26,7 +26,8 @@ Monorepo managed with npm workspaces + Turborepo.
 ## Prerequisites
 
 - Node.js >= 20
-- Docker (for Postgres, Redis, SeaweedFS)
+- Docker (for Postgres and Redis)
+- An AWS S3 bucket (provisioned manually, see `docs/phase-1-implementation-plan.md` M1) and IAM credentials with `s3:PutObject` / `s3:GetObject` / `s3:ListBucket` on that bucket
 - Voyage API key
 - Anthropic API key
 

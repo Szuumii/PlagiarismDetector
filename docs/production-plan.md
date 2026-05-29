@@ -172,8 +172,9 @@ services:
   worker-indexer
   worker-analyzer
   web:         Vite dev server on :5173 (proxies tRPC calls to api)
-  seaweedfs:   S3-compatible local object storage on :8333
 ```
+
+Object storage is **AWS S3** (no local container) — bucket and IAM creds provisioned out-of-band.
 
 `pnpm dev` from the root runs everything via Turborepo. Single `.env` with `VOYAGE_API_KEY`, `ANTHROPIC_API_KEY`, S3/Postgres/Redis URLs.
 
@@ -193,7 +194,7 @@ services:
 - Deploy API and each worker as separate services to Cloud Run / Fly.io / Railway.
 - Build the React SPA and deploy it to a static host / CDN (Cloudflare Pages, Netlify, or S3 + CloudFront); point it at the API origin and enable CORS on the API.
 - Managed Postgres (Neon, Supabase, RDS) with pgvector enabled.
-- Object storage moves from SeaweedFS (local dev) → S3 / R2.
+- Object storage already uses AWS S3 — Phase 2 just hardens it (separate buckets per environment, lifecycle policies, IAM role on the API host instead of access keys in `.env`).
 - **Pino** structured logging across all services.
 - **Sentry** for error tracking.
 - **Bull Board** dashboard for queue depth, failed jobs, retry visibility.
