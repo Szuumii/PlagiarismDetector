@@ -48,7 +48,7 @@ The riskiest "boring" milestone. The whole architecture rests on the `AppRouter`
 - [x] Prisma: `previewFeatures = ["postgresqlExtensions"]`, `extensions = [vector]` on the datasource. Verify the first migration emits `CREATE EXTENSION IF NOT EXISTS vector`.
 - [x] Model the vector column as `Unsupported("vector(1024)")` on `Embedding` (Prisma has no native vector type — it is *not* readable/writable through the typed client; all vector I/O is raw SQL).
 - [x] `packages/llm-clients`: `voyage.ts` + `anthropic.ts` as **typed stubs** (real signatures, deterministic fake output).
-- [x] `packages/core/vector-index.ts`: `searchVector(libraryId, queryEmbedding, k)` stub returning `[]` (library side is global — no `orgId`).
+- [x] `packages/core/vector-index.ts`: `searchVector(queryEmbedding, k)` stub returning `[]` (library side is global — single shared corpus, no `orgId` or `libraryId` filter).
 - S3 bucket is provisioned **manually in the AWS console** (Block Public Access ON, CORS allowing the web origin + `PUT`/`GET`/`HEAD` and exposing `ETag`, dedicated IAM user with least-privilege `s3:PutObject`/`s3:GetObject`/`s3:ListBucket` on this bucket only). No bootstrap code in `apps/api`.
 
 **Exit criteria**
@@ -100,7 +100,7 @@ The riskiest "boring" milestone. The whole architecture rests on the `AppRouter`
 ## M4 — Real retrieval + real judge
 
 **Tasks**
-- [ ] `packages/core/vector-index.ts`: raw-SQL `searchVector` with `ORDER BY vector <=> $1::vector LIMIT $k`, **filtered by libraryId** (library side is global — no `orgId` filter). Pass the embedding as a pgvector literal `'[0.1,...]'` (note: `[...]`, not Postgres `{...}`). Add `CREATE INDEX ... USING hnsw (vector vector_cosine_ops)` as a manual edit in the migration (op class must match the `<=>` cosine operator).
+- [ ] `packages/core/vector-index.ts`: raw-SQL `searchVector` with `ORDER BY vector <=> $1::vector LIMIT $k` — unfiltered (library side is global; there's only one corpus). Pass the embedding as a pgvector literal `'[0.1,...]'` (note: `[...]`, not Postgres `{...}`). Add `CREATE INDEX ... USING hnsw (vector vector_cosine_ops)` as a manual edit in the migration (op class must match the `<=>` cosine operator).
 - [ ] `packages/core/bm25.ts`: MiniSearch rebuilt from DB rows on worker startup, cached per process. **Add a rebuild trigger / rebuild-on-job-start** — a doc indexed after the analyzer started is invisible to BM25 until rebuilt (vector search reads live from DB, so the two halves can disagree).
 - [ ] `packages/core/retrieval.ts`: `hybridSearch` runs vector + BM25 in parallel, fuses with Reciprocal Rank Fusion. **Fuse on rank position, not raw scores** (no normalization needed); handle docs appearing in only one list.
 - [ ] `packages/core/judge.ts`: Anthropic SDK tool-use. `zodToJsonSchema(VerdictSchema)` with refs inlined and `$schema` stripped (Anthropic rejects `$ref`/`definitions`); `tool_choice: { type: "tool", name }` to force the call; find the `tool_use` block by type+name (not index 0); **`VerdictSchema.safeParse` the response**, retry-with-error-fed-back once on failure. Cache the generated JSON schema (it's pure).

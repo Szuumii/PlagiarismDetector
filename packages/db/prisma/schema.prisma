@@ -1,5 +1,8 @@
-// Multi-tenant from day 1: every row carries orgId. Phase 1 hardcodes a single
-// default org. See "Cross-cutting decisions" in docs/phase-1-implementation-plan.md.
+// Asymmetric multi-tenancy from day 1: the library side
+// (Library/Document/Chunk/Embedding) is a global shared corpus with no orgId.
+// The analysis side (Suspect/AnalysisJob/Verdict) is per-org. Phase 1 hardcodes
+// a single default Org for the analysis side. See "Cross-cutting decisions" in
+// docs/phase-1-implementation-plan.md.
 //
 // Vector column is Unsupported("vector(1024)") — not readable/writable through
 // the typed Prisma client; all vector I/O uses raw SQL.
@@ -50,76 +53,46 @@ model Org {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  libraries  Library[]
-  documents  Document[]
-  chunks     Chunk[]
-  embeddings Embedding[]
-  suspects   Suspect[]
-  analyses   AnalysisJob[]
-  verdicts   Verdict[]
-}
-
-model Library {
-  id        String   @id @default(uuid())
-  orgId     String
-  name      String
-  createdAt DateTime @default(now())
-
-  org       Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  documents Document[]
-
-  @@index([orgId])
+  suspects Suspect[]
+  analyses AnalysisJob[]
+  verdicts Verdict[]
 }
 
 model Document {
   id          String         @id @default(uuid())
-  orgId       String
-  libraryId   String
   title       String
   filename    String
   s3Key       String
   status      DocumentStatus @default(pending)
-  contentHash String?
+  contentHash String?        @unique
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  org      Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  library  Library   @relation(fields: [libraryId], references: [id], onDelete: Cascade)
   chunks   Chunk[]
   verdicts Verdict[]
-
-  @@unique([orgId, contentHash])
-  @@index([orgId, libraryId])
 }
 
 model Chunk {
   id          String @id @default(uuid())
-  orgId       String
   documentId  String
   chunkIdx    Int
   content     String
-  contentHash String
+  contentHash String @unique
 
-  org       Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
   document  Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
   embedding Embedding?
 
   @@unique([documentId, chunkIdx])
-  @@unique([orgId, contentHash])
-  @@index([orgId, documentId])
+  @@index([documentId])
 }
 
 model Embedding {
   id      String                      @id @default(uuid())
-  orgId   String
   chunkId String                      @unique
   vector  Unsupported("vector(1024)")
   model   String
 
-  org   Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   chunk Chunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
-
-  @@index([orgId])
 }
 
 model Suspect {

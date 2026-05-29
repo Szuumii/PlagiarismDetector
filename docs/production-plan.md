@@ -79,14 +79,13 @@ tsconfig.base.json
 
 ### `packages/db/schema.prisma`
 
-Asymmetric ownership: library side global, analysis side per-org. Phase 1 hardcodes a default `Org` row and a single default `Library` row.
+Asymmetric ownership: library side global, analysis side per-org. Phase 1 hardcodes a default `Org` row. There is no `Library` table — the "library" is implicit: it's the set of all `Document` rows. This is fine while there's exactly one corpus; introduce a `Library` model later if/when partitioning the corpus becomes a real requirement.
 
 ```
 Org           id, name, slug, createdAt              # tenant root (for the analysis side only)
 
 # Library side — GLOBAL (no orgId)
-Library       id, name, createdAt                     # single shared corpus in Phase 1
-Document      id, libraryId, title, filename, s3Key, status, contentHash, createdAt
+Document      id, title, filename, s3Key, status, contentHash, createdAt
 Chunk         id, documentId, chunkIdx, content, contentHash
 Embedding     id, chunkId, vector(1024), model
 
