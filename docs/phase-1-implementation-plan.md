@@ -2,7 +2,7 @@
 
 ## Context
 
-`production-plan.md` describes migrating a proven four-stage pipeline (chunk → embed → hybrid retrieve → LLM-as-judge) from a Python notebook prototype into a production TypeScript stack. **Phase 1** is the deployable single-node MVP: a library admin uploads reference PDFs, a user submits a suspect PDF, the system asynchronously indexes/retrieves/judges, and the UI streams progressive verdicts. Single Docker Compose, no auth, hardcoded default org — but **multi-tenant schema and production module boundaries from day 1**, and **async from day 1** (indexing takes minutes; HTTP can't carry it).
+`production-plan.md` describes migrating a proven four-stage pipeline (chunk → embed → hybrid retrieve → LLM-as-judge) from a Python notebook prototype into a production TypeScript stack. **Phase 1** is the deployable single-node MVP: a library admin uploads reference PDFs into a single shared library, a user submits a suspect PDF, the system asynchronously indexes/retrieves/judges against that shared library, and the UI streams progressive verdicts. Single Docker Compose, no auth, hardcoded default org — but **asymmetric multi-tenancy from day 1** (library side global, analysis side per-org — see `production-plan.md` key decision #2) and **async from day 1** (indexing takes minutes; HTTP can't carry it).
 
 This document is the *implementation* plan: an ordered, milestone-based build sequence the user will execute with Claude's help. It deliberately keeps prototype references generic — the user will wire in the actual notebook logic, chunking params, RRF constant, judge prompt, and PDF fixtures as they go.
 
@@ -48,7 +48,7 @@ The riskiest "boring" milestone. The whole architecture rests on the `AppRouter`
 - [x] Prisma: `previewFeatures = ["postgresqlExtensions"]`, `extensions = [vector]` on the datasource. Verify the first migration emits `CREATE EXTENSION IF NOT EXISTS vector`.
 - [x] Model the vector column as `Unsupported("vector(1024)")` on `Embedding` (Prisma has no native vector type — it is *not* readable/writable through the typed client; all vector I/O is raw SQL).
 - [x] `packages/llm-clients`: `voyage.ts` + `anthropic.ts` as **typed stubs** (real signatures, deterministic fake output).
-- [x] `packages/core/vector-index.ts`: `searchVector(orgId, libraryId, queryEmbedding, k)` stub returning `[]`.
+- [x] `packages/core/vector-index.ts`: `searchVector(libraryId, queryEmbedding, k)` stub returning `[]` (library side is global — no `orgId`).
 - S3 bucket is provisioned **manually in the AWS console** (Block Public Access ON, CORS allowing the web origin + `PUT`/`GET`/`HEAD` and exposing `ETag`, dedicated IAM user with least-privilege `s3:PutObject`/`s3:GetObject`/`s3:ListBucket` on this bucket only). No bootstrap code in `apps/api`.
 
 **Exit criteria**
@@ -100,7 +100,7 @@ The riskiest "boring" milestone. The whole architecture rests on the `AppRouter`
 ## M4 — Real retrieval + real judge
 
 **Tasks**
-- [ ] `packages/core/vector-index.ts`: raw-SQL `searchVector` with `ORDER BY vector <=> $1::vector LIMIT $k`, **filtered by orgId + libraryId**. Pass the embedding as a pgvector literal `'[0.1,...]'` (note: `[...]`, not Postgres `{...}`). Add `CREATE INDEX ... USING hnsw (vector vector_cosine_ops)` as a manual edit in the migration (op class must match the `<=>` cosine operator).
+- [ ] `packages/core/vector-index.ts`: raw-SQL `searchVector` with `ORDER BY vector <=> $1::vector LIMIT $k`, **filtered by libraryId** (library side is global — no `orgId` filter). Pass the embedding as a pgvector literal `'[0.1,...]'` (note: `[...]`, not Postgres `{...}`). Add `CREATE INDEX ... USING hnsw (vector vector_cosine_ops)` as a manual edit in the migration (op class must match the `<=>` cosine operator).
 - [ ] `packages/core/bm25.ts`: MiniSearch rebuilt from DB rows on worker startup, cached per process. **Add a rebuild trigger / rebuild-on-job-start** — a doc indexed after the analyzer started is invisible to BM25 until rebuilt (vector search reads live from DB, so the two halves can disagree).
 - [ ] `packages/core/retrieval.ts`: `hybridSearch` runs vector + BM25 in parallel, fuses with Reciprocal Rank Fusion. **Fuse on rank position, not raw scores** (no normalization needed); handle docs appearing in only one list.
 - [ ] `packages/core/judge.ts`: Anthropic SDK tool-use. `zodToJsonSchema(VerdictSchema)` with refs inlined and `$schema` stripped (Anthropic rejects `$ref`/`definitions`); `tool_choice: { type: "tool", name }` to force the call; find the `tool_use` block by type+name (not index 0); **`VerdictSchema.safeParse` the response**, retry-with-error-fed-back once on failure. Cache the generated JSON schema (it's pure).
@@ -134,7 +134,7 @@ The riskiest "boring" milestone. The whole architecture rests on the `AppRouter`
 
 ## Cross-cutting decisions to lock early
 
-- **orgId everywhere from day 1.** Thread it through raw SQL `WHERE` clauses, the MiniSearch filter/per-org index, and unique constraints (`@@unique([orgId, contentHash])`, not bare `contentHash`). Inject the hardcoded default org via tRPC context — never hardcode it inside queries. Retrofitting tenancy into raw SQL + unique constraints is migration pain.
+- **Asymmetric multi-tenancy — pick the side per query.** Library side (`Library`/`Document`/`Chunk`/`Embedding`) is global: no `orgId` column, no `orgId` filter in vector / BM25 / SQL. Analysis side (`Suspect`/`AnalysisJob`/`Verdict`) is per-org: every read and write filters by `ctx.orgId`. Inject the hardcoded default org via tRPC context — never hardcode it inside queries. Unique constraints follow the same split: `@@unique([contentHash])` on library-side rows, `@@unique([orgId, …])` on analysis-side rows (if added later). Suspect uploads never become Library Documents, so there's no cross-side write path that could leak one tenant's text into the shared corpus.
 - **Zod is the single source of truth.** `VerdictSchema` in `packages/schemas` generates the Anthropic tool schema, validates the response, types the Prisma write, and types the tRPC output. Regenerate the tool JSON schema from the Zod object so drift is impossible.
 - **The only thing crossing api → web is the erasable `AppRouter` type.** Workers never import from `apps/api`; they share via `packages/schemas` + `packages/db`.
 - **Single AWS S3 client config.** `apps/api` (presigned URL signing) and the workers (`GetObject`) share one `S3Client` instance per region. No endpoint override, no `forcePathStyle`. Pin `Content-Type` at sign time and have the browser send exactly that (mismatch → 403). Configure CORS on the bucket in the AWS console (`AllowedOrigins`: web origin; `AllowedMethods`: `PUT`/`GET`/`HEAD`; expose `ETag`).

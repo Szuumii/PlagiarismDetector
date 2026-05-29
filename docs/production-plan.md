@@ -42,9 +42,9 @@ See [`architecture.excalidraw`](./architecture.excalidraw) for the diagram (open
 
 ### Goal
 
-A deployable single-node TypeScript application that does end-to-end plagiarism detection: library admin can upload reference PDFs; users can submit a suspect; the system asynchronously indexes, retrieves, and judges; the UI shows progressive results. Single Docker Compose, no auth, hardcoded default org, but the data model and module boundaries are production-ready.
+A deployable single-node TypeScript application that does end-to-end plagiarism detection: library admin can upload reference PDFs into a **single shared library**; any user from any org can submit a suspect; the system asynchronously indexes, retrieves, and judges against that shared library; the UI shows progressive results. Single Docker Compose, no auth, hardcoded default org, but the data model and module boundaries are production-ready.
 
-Async from day 1 (library indexing takes minutes; HTTP can't carry it). Multi-tenant schema from day 1 (retrofitting `orgId` later is painful) but single-tenant API surface.
+Async from day 1 (library indexing takes minutes; HTTP can't carry it). **Asymmetric multi-tenancy from day 1**: the library side (`Library`/`Document`/`Chunk`/`Embedding`) is a global, app-wide corpus with no `orgId`. The analysis side (`Suspect`/`AnalysisJob`/`Verdict`) is per-org — uploads and verdicts belong to the submitting tenant and never get added back to the library. Single-tenant API surface in Phase 1 (one hardcoded default org).
 
 ### Monorepo layout (pnpm workspaces + Turborepo)
 
@@ -79,14 +79,18 @@ tsconfig.base.json
 
 ### `packages/db/schema.prisma`
 
-Multi-tenant from day 1; Phase 1 hardcodes a default `Org` row.
+Asymmetric ownership: library side global, analysis side per-org. Phase 1 hardcodes a default `Org` row and a single default `Library` row.
 
 ```
-Org           id, name, createdAt
-Library       id, orgId, name, createdAt
-Document      id, libraryId, orgId, title, filename, s3Key, status, contentHash, createdAt
-Chunk         id, documentId, orgId, chunkIdx, content, contentHash
-Embedding     id, chunkId, orgId, vector(1024), model
+Org           id, name, slug, createdAt              # tenant root (for the analysis side only)
+
+# Library side — GLOBAL (no orgId)
+Library       id, name, createdAt                     # single shared corpus in Phase 1
+Document      id, libraryId, title, filename, s3Key, status, contentHash, createdAt
+Chunk         id, documentId, chunkIdx, content, contentHash
+Embedding     id, chunkId, vector(1024), model
+
+# Analysis side — PER-ORG (orgId required)
 Suspect       id, orgId, filename, s3Key, status, createdAt
 AnalysisJob   id, suspectId, orgId, status, error, startedAt, completedAt
 Verdict       id, analysisJobId, candidateDocId, orgId, verdict, plagiarismType,
@@ -95,7 +99,9 @@ EvidencePair  id, verdictId, pairIndex, suspectPassage, libraryPassage,
               searchScore, supportsVerdict, note
 ```
 
-`Chunk.contentHash` and `Document.contentHash` enable idempotent re-indexing (skip if already embedded). All vector columns use pgvector's `vector(1024)` type.
+`Verdict.candidateDocId` references the global `Document`; this is the only cross-side relation and it's the whole point — every org's analyses cite the same shared corpus.
+
+`Chunk.contentHash` and `Document.contentHash` enable idempotent re-indexing (skip if already embedded). Because the library is global, the uniqueness is plain `@@unique([contentHash])` — no `orgId` prefix. All vector columns use pgvector's `vector(1024)` type.
 
 `status` is a state machine: `pending | parsing | embedding | indexed | failed` (documents) and `pending | parsing | searching | judging | done | failed` (analyses).
 
@@ -217,7 +223,7 @@ Object storage is **AWS S3** (no local container) — bucket and IAM creds provi
 ### Phase 5 — Production hardening
 
 - **Auth**: token-based, since the frontend is a static SPA — Clerk, Auth0, or Lucia/custom JWT (httpOnly cookie). Auth.js/NextAuth assumes a Next.js server, so it does not fit here. Token flows through tRPC context; relevant identifiers propagate to workers via the job payload.
-- **Multi-tenancy enforcement** at the API layer (schema already supports it). Every tRPC query scopes by `ctx.orgId`.
+- **Multi-tenancy enforcement** at the API layer (schema already supports it). tRPC procedures touching the analysis side (`analyses.*`) scope by `ctx.orgId`; procedures touching the global library side do not. Phase 5 also decides whether library *administration* (`library.documents.create`) becomes admin-only or stays open — Phase 1 leaves it open.
 - **PDF parsing sandbox**: isolate the parser in a worker process with restricted network/filesystem permissions, or graduate to a Python sidecar with no egress.
 - **Prompt-injection defenses**: delimiter-wrap suspect text in the judge prompt; pre-scan suspect text for known injection patterns; optionally pre-summarize suspect text through a separate Claude call so the judge never sees raw attacker-controlled tokens.
 - **OpenTelemetry** end-to-end traces (API → queue → worker → upstream API).
@@ -227,7 +233,7 @@ Object storage is **AWS S3** (no local container) — bucket and IAM creds provi
 ## Key design decisions
 
 1. **Async from day 1.** Synchronous HTTP cannot carry library indexing. BullMQ + Redis is the foundation, not a Phase 2 addition.
-2. **Multi-tenant schema, single-tenant API in Phase 1.** Every row gets `orgId`; Phase 1 hardcodes a default org. Retrofitting tenancy later requires rewriting every query.
+2. **Asymmetric multi-tenancy, single-tenant API in Phase 1.** The library side (`Library`/`Document`/`Chunk`/`Embedding`) is a global shared corpus — no `orgId`. The analysis side (`Suspect`/`AnalysisJob`/`Verdict`) is per-org. Phase 1 hardcodes a default org for the analysis side. The split avoids paying a multi-tenant cost on every retrieval query while keeping tenant isolation where it matters (user uploads + their verdicts). Retrofitting tenancy onto the analysis side later would require rewriting queries; doing it upfront is cheap.
 3. **Zod is the single schema language.** HTTP boundaries, LLM tool-use, BullMQ job payloads, and DB row adapters all reuse the same Zod schemas. The judge verdict schema is the most reused type in the system.
 4. **Anthropic tool-use, not JSON-in-prompt.** Tool input schema is the Zod verdict schema converted to JSON Schema; responses are validated against the same Zod schema.
 5. **pgvector first, Qdrant when measured.** pgvector handles ~1M vectors in a single Postgres comfortably. Do not add Qdrant until pgvector latency is a measured bottleneck.

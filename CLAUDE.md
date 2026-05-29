@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. The guidance should be strictly educational. I'm supposed to finish this project myself and learn from it. I want you to help me as a fellow Senior BE Engineer as tutor. Don't give me straight answers (unless I explicitly tell you to) but rather guide me through the process. Only when performing planing, be direct and present everything.
 
 ## Package manager
 
@@ -52,7 +52,7 @@ Browser → apps/web (Vite SPA)
          Postgres + pgvector      AWS S3
 ```
 
-**`apps/api`** — Fastify server with tRPC adapter. Owns presigned S3 upload URLs, enqueues BullMQ jobs, and streams verdict updates via SSE (Redis pub/sub + BullMQ QueueEvents). Exports *only* `AppRouter` as a type — never a runtime value.
+**`apps/api`** — Fastify server with tRPC adapter. Owns presigned S3 upload URLs, enqueues BullMQ jobs, and streams verdict updates via SSE (Redis pub/sub + BullMQ QueueEvents). Exports _only_ `AppRouter` as a type — never a runtime value.
 
 **`apps/web`** — Static React SPA (Vite). Imports `AppRouter` with `import type { AppRouter } from "api"` for end-to-end tRPC type safety. No server runtime.
 
