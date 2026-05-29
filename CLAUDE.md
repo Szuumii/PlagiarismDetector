@@ -85,7 +85,7 @@ During `npm run dev`, library packages run `tsdown --watch` (rebuilding `dist/` 
 
 ## Key constraints
 
-- **`orgId` on every model and query** — schema is multi-tenant from day one even though Phase 1 hardcodes a default org. Never scope a query without `orgId`.
+- **Asymmetric multi-tenancy** — the library side (`Document`/`Chunk`/`Embedding`) is a single global shared corpus with no `orgId`; "the library" is implicit as the set of all `Document` rows (no `Library` table). The analysis side (`Suspect`/`AnalysisJob`/`Verdict`) is per-org and **must** scope every query by `orgId`. Suspect uploads never become library Documents — there is no cross-side write path. Phase 1 hardcodes a single default `Org` for the analysis side.
 - **Single AWS S3 client config** — `apps/api` (presigned URL signing) and the workers (`GetObject`) share one `S3Client` instance per region. No endpoint override, no `forcePathStyle`. Bucket name + IAM credentials come from `.env` (locally) or an attached IAM role (in prod). The bucket is provisioned out-of-band in the AWS console — the API does not bootstrap it. Sign presigned PUTs with `ContentType: "application/pdf"` and have the browser send exactly that header (mismatch → 403). Bucket CORS must allow the web origin + `PUT`/`GET`/`HEAD` and expose `ETag`.
 - **ioredis** connections require `maxRetriesPerRequest: null` for BullMQ to start.
 - **Prisma pgvector**: pass embeddings as a literal string `'[0.1,0.2,...]'::vector` in raw SQL — the `Unsupported` type is not readable/writable through the typed Prisma client.

@@ -1,4 +1,4 @@
-.PHONY: start-dev start-dev-docker up down logs db-generate db-migrate db-studio clean install
+.PHONY: start-dev start-dev-docker up down logs db-generate db-migrate db-seed db-studio clean install
 
 # Bring up infra (postgres + redis), ensure the Prisma client and
 # package builds exist, then run the api + web dev servers in the foreground.
@@ -31,6 +31,9 @@ db-generate: ## regenerate the Prisma client
 
 db-migrate: .env ## apply / create migrations (interactive prisma migrate dev)
 	set -a; . ./.env; set +a; npm run db:migrate -w @repo/db
+
+db-seed: .env ## run prisma db seed (creates default Org)
+	set -a; . ./.env; set +a; npm run db:seed -w @repo/db
 
 db-studio: .env ## open Prisma Studio
 	set -a; . ./.env; set +a; npm run db:studio -w @repo/db
