@@ -65,9 +65,23 @@ services:
     depends_on:
       - api
 
-# MinIO will be added here in a later M1 step.
+  seaweedfs:
+    image: chrislusf/seaweedfs:3.71
+    command: server -s3 -s3.config=/etc/seaweedfs/s3-config.json -dir=/data
+    ports:
+      - "8333:8333"
+    volumes:
+      - seaweed_data:/data
+      - ./infra/seaweedfs/s3-config.json:/etc/seaweedfs/s3-config.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:9333/cluster/status || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
 volumes:
   pgdata:
   api_node_modules:
   web_node_modules:
+  seaweed_data:

@@ -49,14 +49,14 @@ Browser → apps/web (Vite SPA)
             ↕ BullMQ queues (Redis)
          apps/worker-indexer   apps/worker-analyzer
             ↕                         ↕
-         Postgres + pgvector      MinIO (S3)
+         Postgres + pgvector      SeaweedFS (S3)
 ```
 
-**`apps/api`** — Fastify server with tRPC adapter. Owns presigned MinIO upload URLs, enqueues BullMQ jobs, and streams verdict updates via SSE (Redis pub/sub + BullMQ QueueEvents). Exports *only* `AppRouter` as a type — never a runtime value.
+**`apps/api`** — Fastify server with tRPC adapter. Owns presigned S3 upload URLs (SeaweedFS in dev), enqueues BullMQ jobs, and streams verdict updates via SSE (Redis pub/sub + BullMQ QueueEvents). Exports *only* `AppRouter` as a type — never a runtime value.
 
 **`apps/web`** — Static React SPA (Vite). Imports `AppRouter` with `import type { AppRouter } from "api"` for end-to-end tRPC type safety. No server runtime.
 
-**`apps/worker-indexer`** — Consumes `index-document` queue. Downloads PDF from MinIO → extract → chunk → embed (Voyage) → upsert `Chunk`/`Embedding` rows.
+**`apps/worker-indexer`** — Consumes `index-document` queue. Downloads PDF from S3 (SeaweedFS in dev) → extract → chunk → embed (Voyage) → upsert `Chunk`/`Embedding` rows.
 
 **`apps/worker-analyzer`** — Consumes `analyze-suspect` queue. Downloads suspect PDF → hybrid search (vector + BM25) → Claude judge per candidate → streams `Verdict` rows via Redis pub/sub as each completes.
 
@@ -86,7 +86,7 @@ During `npm run dev`, library packages run `tsdown --watch` (rebuilding `dist/` 
 ## Key constraints
 
 - **`orgId` on every model and query** — schema is multi-tenant from day one even though Phase 1 hardcodes a default org. Never scope a query without `orgId`.
-- **Two MinIO S3 clients** — browser presigned URLs use `http://localhost:9000`; workers use `http://minio:9000` (internal). Rewriting the host on a signed URL breaks SigV4. Both need `forcePathStyle: true`.
+- **Two SeaweedFS S3 clients** — browser presigned URLs use `http://localhost:8333`; workers use `http://seaweedfs:8333` (internal). Rewriting the host on a signed URL breaks SigV4. Both need `forcePathStyle: true`.
 - **ioredis** connections require `maxRetriesPerRequest: null` for BullMQ to start.
 - **Prisma pgvector**: pass embeddings as a literal string `'[0.1,0.2,...]'::vector` in raw SQL — the `Unsupported` type is not readable/writable through the typed Prisma client.
 - **Idempotency**: all worker jobs must be re-runnable without duplicating rows — use `contentHash` unique constraints and upsert patterns.

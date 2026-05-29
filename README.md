@@ -17,7 +17,7 @@ Academic plagiarism detection pipeline built on TypeScript. Upload reference PDF
 | Frontend | React + Vite + React Router |
 | Queue | BullMQ + Redis |
 | Database | Postgres + pgvector (Prisma) |
-| Object storage | MinIO (S3-compatible) |
+| Object storage | SeaweedFS (S3-compatible) |
 | Embeddings | Voyage `voyage-3-large` |
 | Judge | Anthropic Claude (tool-use) |
 
@@ -26,7 +26,7 @@ Monorepo managed with npm workspaces + Turborepo.
 ## Prerequisites
 
 - Node.js >= 20
-- Docker (for Postgres, Redis, MinIO)
+- Docker (for Postgres, Redis, SeaweedFS)
 - Voyage API key
 - Anthropic API key
 

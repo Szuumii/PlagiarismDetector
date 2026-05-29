@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "plagiarism-dev",
+      "credentials": [
+        {
+          "accessKey": "plagiarism-dev",
+          "secretKey": "plagiarism-dev-secret-do-not-use-in-prod"
+        }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

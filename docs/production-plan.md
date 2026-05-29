@@ -172,7 +172,7 @@ services:
   worker-indexer
   worker-analyzer
   web:         Vite dev server on :5173 (proxies tRPC calls to api)
-  minio:       S3-compatible local object storage on :9000
+  seaweedfs:   S3-compatible local object storage on :8333
 ```
 
 `pnpm dev` from the root runs everything via Turborepo. Single `.env` with `VOYAGE_API_KEY`, `ANTHROPIC_API_KEY`, S3/Postgres/Redis URLs.
@@ -193,7 +193,7 @@ services:
 - Deploy API and each worker as separate services to Cloud Run / Fly.io / Railway.
 - Build the React SPA and deploy it to a static host / CDN (Cloudflare Pages, Netlify, or S3 + CloudFront); point it at the API origin and enable CORS on the API.
 - Managed Postgres (Neon, Supabase, RDS) with pgvector enabled.
-- Object storage moves from MinIO → S3 / R2.
+- Object storage moves from SeaweedFS (local dev) → S3 / R2.
 - **Pino** structured logging across all services.
 - **Sentry** for error tracking.
 - **Bull Board** dashboard for queue depth, failed jobs, retry visibility.

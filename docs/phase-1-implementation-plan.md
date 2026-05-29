@@ -44,15 +44,15 @@ The riskiest "boring" milestone. The whole architecture rests on the `AppRouter`
 ## M1 — Infra up: docker-compose + Prisma migrate + pgvector
 
 **Tasks**
-- [ ] `docker-compose.yml` with `postgres` (pgvector image), `redis`, `minio`. **Hold off containerizing api/workers/web until M5** — run them on the host against composed infra for fast iteration.
+- [ ] `docker-compose.yml` with `postgres` (pgvector image), `redis`, `seaweedfs` (S3-compatible local store; replaces MinIO). **Hold off containerizing api/workers/web until M5** — run them on the host against composed infra for fast iteration.
 - [x] Prisma: `previewFeatures = ["postgresqlExtensions"]`, `extensions = [vector]` on the datasource. Verify the first migration emits `CREATE EXTENSION IF NOT EXISTS vector`.
 - [x] Model the vector column as `Unsupported("vector(1024)")` on `Embedding` (Prisma has no native vector type — it is *not* readable/writable through the typed client; all vector I/O is raw SQL).
 - [x] `packages/llm-clients`: `voyage.ts` + `anthropic.ts` as **typed stubs** (real signatures, deterministic fake output).
 - [x] `packages/core/vector-index.ts`: `searchVector(orgId, libraryId, queryEmbedding, k)` stub returning `[]`.
-- [ ] MinIO bucket bootstrap: a one-shot `mc mb` init sidecar or create-on-startup in the API (first upload 404s otherwise).
+- [ ] S3 bucket bootstrap: API runs `HeadBucket` → `CreateBucket` on first boot (SeaweedFS auto-provisions on the `CreateBucket` call; no cluster init or sidecar required). Implementation lands in M2 alongside the first S3 client wiring.
 
 **Exit criteria**
-- `docker compose up` brings up pg/redis/minio; `prisma migrate dev` applies cleanly; `\d "Embedding"` shows `vector(1024)`.
+- `docker compose up` brings up pg/redis/seaweedfs; `prisma migrate dev` applies cleanly; `\d "Embedding"` shows `vector(1024)`.
 - A throwaway `$queryRaw` of `'[...]'::vector(1024) <=> '[...]'::vector(1024)` returns a cosine distance.
 
 **Key files:** `packages/db/prisma/schema.prisma`, `docker-compose.yml`.
@@ -137,7 +137,7 @@ The riskiest "boring" milestone. The whole architecture rests on the `AppRouter`
 - **orgId everywhere from day 1.** Thread it through raw SQL `WHERE` clauses, the MiniSearch filter/per-org index, and unique constraints (`@@unique([orgId, contentHash])`, not bare `contentHash`). Inject the hardcoded default org via tRPC context — never hardcode it inside queries. Retrofitting tenancy into raw SQL + unique constraints is migration pain.
 - **Zod is the single source of truth.** `VerdictSchema` in `packages/schemas` generates the Anthropic tool schema, validates the response, types the Prisma write, and types the tRPC output. Regenerate the tool JSON schema from the Zod object so drift is impossible.
 - **The only thing crossing api → web is the erasable `AppRouter` type.** Workers never import from `apps/api`; they share via `packages/schemas` + `packages/db`.
-- **Two MinIO S3 client configs.** Sign browser presigned URLs with the *browser-reachable* endpoint (`http://localhost:9000`); workers download via the *internal* endpoint (`http://minio:9000`). Rewriting the host on a signed URL invalidates the SigV4 signature. `forcePathStyle: true` is mandatory; pin `Content-Type` at sign time and have the client send exactly that (mismatch → 403). Configure MinIO CORS for the web origin + PUT.
+- **Two SeaweedFS S3 client configs.** Sign browser presigned URLs with the *browser-reachable* endpoint (`http://localhost:8333`); workers download via the *internal* endpoint (`http://seaweedfs:8333`). Rewriting the host on a signed URL invalidates the SigV4 signature. `forcePathStyle: true` is mandatory; pin `Content-Type` at sign time and have the client send exactly that (mismatch → 403). Configure CORS on the bucket (via `PutBucketCors`) for the web origin + PUT.
 - **Deterministic `jobId`** (documentId / analysisJobId) so double `confirmUpload` is deduped. ioredis connection needs `maxRetriesPerRequest: null` or BullMQ won't start.
 - **unpdf in Docker:** verify it runs headless in the slim Node image (test inside the container at M3, not just on macOS).
 
