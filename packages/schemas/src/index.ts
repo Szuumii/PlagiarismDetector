@@ -67,6 +67,12 @@ export type ConfirmDocumentUploadInput = z.infer<
   typeof ConfirmDocumentUploadInputSchema
 >;
 
+export const ConfirmDocumentResponseSchema = z.object({
+  enqueued: z.literal(true),
+  jobId: z.string().uuid()
+})
+export type ConfirmDocumentResponse = z.infer<typeof ConfirmDocumentResponseSchema>
+
 export const CreateAnalysisInputSchema = z.object({
   filename: z.string().endsWith(".pdf"),
 });
