@@ -40,6 +40,17 @@ export const analysesRouter = router({
         });
       }
 
+      const existing = await ctx.db.analysisJob.findFirst({
+        where: {
+          suspectId: suspect.id,
+          orgId: ctx.orgId,
+          status: { in: ["pending", "parsing", "searching", "judging"] },
+        },
+      })
+      if (existing) {
+        return { analysisJobId: existing.id }
+      }
+
       const [updatedSuspect, analysisJob] = await ctx.db.$transaction([
         ctx.db.suspect.update({ data: { status: 'uploaded' }, where: { id: suspect.id } }),
         ctx.db.analysisJob.create({
