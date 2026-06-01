@@ -1,3 +1,4 @@
+import { analysesRouter } from "./routers/analyses";
 import { libraryRouter } from "./routers/library";
 import { publicProcedure, router } from "./trpc";
 
@@ -9,6 +10,7 @@ export const appRouter = router({
     })),
   }),
   library: libraryRouter,
+  analyses: analysesRouter
 });
 
 // Only the *type* crosses the api → web boundary. web imports this with

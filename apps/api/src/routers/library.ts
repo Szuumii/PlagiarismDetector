@@ -1,14 +1,14 @@
 import {
-  ConfirmDocumentResponseSchema,
   ConfirmDocumentUploadInputSchema,
+  ConfirmDocumentUploadResponseSchema,
   CreateDocumentInputSchema,
   CreateDocumentResponseSchema,
   IndexDocumentJobSchema
 } from "@repo/schemas";
 
 import { TRPCError } from "@trpc/server";
-import { libraryObjectKey, presignUploadUrl } from "../s3";
-import { publicProcedure, router } from "../trpc";
+import { libraryObjectKey, presignUploadUrl } from "@/s3";
+import { publicProcedure, router } from "@/trpc";
 
 export const libraryRouter = router({
   documents: router({
@@ -35,7 +35,7 @@ export const libraryRouter = router({
       }),
     confirmUpload: publicProcedure
       .input(ConfirmDocumentUploadInputSchema)
-      .output(ConfirmDocumentResponseSchema)
+      .output(ConfirmDocumentUploadResponseSchema)
       .mutation(async ({ ctx, input }) => {
         const documentId = input.documentId
 

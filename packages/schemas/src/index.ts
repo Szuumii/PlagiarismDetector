@@ -67,11 +67,11 @@ export type ConfirmDocumentUploadInput = z.infer<
   typeof ConfirmDocumentUploadInputSchema
 >;
 
-export const ConfirmDocumentResponseSchema = z.object({
+export const ConfirmDocumentUploadResponseSchema = z.object({
   enqueued: z.literal(true),
   jobId: z.string().uuid()
 })
-export type ConfirmDocumentResponse = z.infer<typeof ConfirmDocumentResponseSchema>
+export type ConfirmDocumentUploadResponse = z.infer<typeof ConfirmDocumentUploadResponseSchema>
 
 export const CreateAnalysisInputSchema = z.object({
   filename: z.string().endsWith(".pdf"),
@@ -89,3 +89,7 @@ export const ConfirmAnalysisUploadInputSchema = z.object({
 export type ConfirmAnalysisUploadInput = z.infer<
   typeof ConfirmAnalysisUploadInputSchema
 >;
+export const ConfirmAnalysisUploadResponseSchema = z.object({
+  analysisJobId: z.string().uuid(),
+})
+export type ConfirmAnalysisUploadResponse = z.infer<typeof ConfirmAnalysisUploadResponseSchema>
