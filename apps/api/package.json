@@ -16,9 +16,12 @@
     "lint": "eslint src"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1056.0",
+    "@aws-sdk/s3-request-presigner": "^3.1056.0",
     "@fastify/compress": "^8.0.0",
     "@fastify/cors": "^11.0.0",
     "@fastify/static": "^9.0.0",
+    "@repo/config": "*",
     "@repo/db": "*",
     "@repo/schemas": "*",
     "@trpc/server": "^11.0.0",
@@ -28,7 +31,6 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@repo/config": "*",
     "tsx": "^4.15.0",
     "typescript": "^5.5.0"
   }
