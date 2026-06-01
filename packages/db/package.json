@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "prisma generate && tsdown",
-    "dev": "tsdown --watch",
+    "dev": "tsdown --watch --no-clean",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",

@@ -1,9 +1,5 @@
-import { initTRPC } from "@trpc/server";
-
-const t = initTRPC.create();
-
-export const router = t.router;
-export const publicProcedure = t.procedure;
+import { libraryRouter } from "./routers/library";
+import { publicProcedure, router } from "./trpc";
 
 export const appRouter = router({
   health: router({
@@ -12,6 +8,7 @@ export const appRouter = router({
       ts: Date.now(),
     })),
   }),
+  library: libraryRouter,
 });
 
 // Only the *type* crosses the api → web boundary. web imports this with

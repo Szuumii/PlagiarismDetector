@@ -23,19 +23,63 @@ export const VerdictSchema = z.object({
 export type Verdict = z.infer<typeof VerdictSchema>;
 
 // ── Queue job payloads ───────────────────────────────────────────────────────
-// orgId travels on every job — the schema is multi-tenant from day 1.
+// orgId is per-org for the analysis side (AnalyzeSuspectJob); the library side
+// (IndexDocumentJob) is global and carries no orgId.
 
 export const IndexDocumentJobSchema = z.object({
-  orgId: z.string(),
-  libraryId: z.string(),
-  documentId: z.string(),
-  objectKey: z.string(),
+  documentId: z.string().uuid(),
+  objectKey: z.string().min(1),
 });
 export type IndexDocumentJob = z.infer<typeof IndexDocumentJobSchema>;
 
 export const AnalyzeSuspectJobSchema = z.object({
-  orgId: z.string(),
-  analysisJobId: z.string(),
-  objectKey: z.string(),
+  orgId: z.string().uuid(),
+  analysisJobId: z.string().uuid(),
+  objectKey: z.string().min(1),
 });
 export type AnalyzeSuspectJob = z.infer<typeof AnalyzeSuspectJobSchema>;
+
+// ── Upload procedure I/O ─────────────────────────────────────────────────────
+// Shared shape: every create-procedure returns a presigned PUT URL alongside
+// the new entity's id. The create-response schemas extend this fragment.
+
+export const PresignedUploadSchema = z.object({
+  uploadUrl: z.string().url(),
+  objectKey: z.string().min(1),
+});
+export type PresignedUpload = z.infer<typeof PresignedUploadSchema>;
+
+export const CreateDocumentInputSchema = z.object({
+  title: z.string().min(1),
+  filename: z.string().endsWith(".pdf"),
+});
+export type CreateDocumentInput = z.infer<typeof CreateDocumentInputSchema>;
+
+export const CreateDocumentResponseSchema = PresignedUploadSchema.extend({
+  documentId: z.string().uuid(),
+});
+export type CreateDocumentResponse = z.infer<typeof CreateDocumentResponseSchema>;
+
+export const ConfirmDocumentUploadInputSchema = z.object({
+  documentId: z.string().uuid(),
+});
+export type ConfirmDocumentUploadInput = z.infer<
+  typeof ConfirmDocumentUploadInputSchema
+>;
+
+export const CreateAnalysisInputSchema = z.object({
+  filename: z.string().endsWith(".pdf"),
+});
+export type CreateAnalysisInput = z.infer<typeof CreateAnalysisInputSchema>;
+
+export const CreateAnalysisResponseSchema = PresignedUploadSchema.extend({
+  suspectId: z.string().uuid(),
+});
+export type CreateAnalysisResponse = z.infer<typeof CreateAnalysisResponseSchema>;
+
+export const ConfirmAnalysisUploadInputSchema = z.object({
+  suspectId: z.string().uuid(),
+});
+export type ConfirmAnalysisUploadInput = z.infer<
+  typeof ConfirmAnalysisUploadInputSchema
+>;

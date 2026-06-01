@@ -1,5 +1,20 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "NODE_ENV",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "DEFAULT_ORG_ID",
+    "S3_REGION",
+    "S3_BUCKET",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "VOYAGE_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "API_PORT",
+    "PORT",
+    "API_URL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
