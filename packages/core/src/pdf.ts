@@ -1,13 +1,28 @@
-// M2 stub: returns a constant multi-paragraph string. The double-newline
-// boundaries are what the chunking stub splits on. Real implementation
-// (unpdf) lands in M3; signature stays stable across the swap.
+import { extractText as unpdfExtract } from "unpdf";
 
-const FAKE_TEXT = [
-  "First paragraph of the fake document. This stands in for whatever the real PDF extractor would produce.",
-  "Second paragraph with different content so chunking has more than one chunk to work with.",
-  "Third paragraph rounding out the fixture; the indexer should produce three Chunk rows from this.",
-].join("\n\n");
+const REFERENCES_TAIL_PATTERN = /^\s*(references|bibliography|works cited)\s*$/gim;
+const TAIL_POSITION_THRESHOLD = 0.7;
 
-export async function extractText(_buffer: Uint8Array): Promise<string> {
-  return FAKE_TEXT;
+function normalizeWhitespace(text: string): string {
+  return text
+    .replace(/\r\n?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// Find the *last* References-like heading on its own line. Only strip if it
+// falls in the tail of the document — body-text mentions of "References"
+// rarely sit that close to the end, so this heuristic minimizes false cuts.
+function stripReferencesTail(text: string): string {
+  const matches = [...text.matchAll(REFERENCES_TAIL_PATTERN)];
+  if (matches.length === 0) return text;
+  const last = matches[matches.length - 1];
+  const idx = last.index ?? 0;
+  if (idx / text.length < TAIL_POSITION_THRESHOLD) return text;
+  return text.slice(0, idx).trimEnd();
+}
+
+export async function extractText(buffer: Uint8Array): Promise<string> {
+  const { text } = await unpdfExtract(buffer, { mergePages: true });
+  return stripReferencesTail(normalizeWhitespace(text));
 }
