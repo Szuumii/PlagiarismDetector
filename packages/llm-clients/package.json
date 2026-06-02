@@ -19,11 +19,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",
+    "@repo/config": "*",
     "@repo/schemas": "*",
     "zod-to-json-schema": "^3.23.0"
   },
   "devDependencies": {
-    "@repo/config": "*",
     "typescript": "^5.5.0"
   }
 }
