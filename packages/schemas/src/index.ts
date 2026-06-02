@@ -93,3 +93,11 @@ export const ConfirmAnalysisUploadResponseSchema = z.object({
   analysisJobId: z.string().uuid(),
 })
 export type ConfirmAnalysisUploadResponse = z.infer<typeof ConfirmAnalysisUploadResponseSchema>
+
+// ── Pub/sub channel conventions ──────────────────────────────────────────────
+// Shared between the worker-analyzer (publisher) and apps/api (SSE subscriber,
+// Task 4). Single source of truth so the channel format can't drift.
+
+export function verdictChannel(analysisJobId: string): string {
+  return `verdicts:${analysisJobId}`;
+}

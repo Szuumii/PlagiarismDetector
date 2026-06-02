@@ -4,3 +4,5 @@ export * from "./pdf";
 export * from "./chunking";
 export * from "./embeddings";
 export * from "./vector-index";
+export * from "./retrieval";
+export * from "./judge";
