@@ -101,3 +101,53 @@ export type ConfirmAnalysisUploadResponse = z.infer<typeof ConfirmAnalysisUpload
 export function verdictChannel(analysisJobId: string): string {
   return `verdicts:${analysisJobId}`;
 }
+
+// ── Analysis read-side ───────────────────────────────────────────────────────
+// `analyses.get` returns the AnalysisJob's current state plus all verdicts
+// written so far. UI polls this until status is terminal (done | failed).
+// SSE is deferred — see plan §M2 Task 4.
+
+export const AnalysisStatusSchema = z.enum([
+  "pending",
+  "parsing",
+  "searching",
+  "judging",
+  "done",
+  "failed",
+]);
+export type AnalysisStatus = z.infer<typeof AnalysisStatusSchema>;
+
+export const GetAnalysisInputSchema = z.object({
+  analysisJobId: z.string().uuid(),
+});
+export type GetAnalysisInput = z.infer<typeof GetAnalysisInputSchema>;
+
+const VerdictWithEvidenceSchema = z.object({
+  id: z.string().uuid(),
+  candidateDocId: z.string().uuid(),
+  label: VerdictLabelSchema,
+  confidence: z.number().min(0).max(1),
+  reasoning: z.string(),
+  searchScore: z.number(),
+  evidence: z.array(
+    z.object({
+      pairIndex: z.number().int().nonnegative(),
+      suspectText: z.string(),
+      sourceText: z.string(),
+      note: z.string(),
+    }),
+  ),
+});
+
+export const GetAnalysisResponseSchema = z.object({
+  id: z.string().uuid(),
+  status: AnalysisStatusSchema,
+  error: z.string().nullable(),
+  // ISO strings on the wire — no superjson transformer configured, so
+  // Date objects would lose typing across the api → web boundary. Convert
+  // explicitly in the procedure.
+  startedAt: z.string().datetime().nullable(),
+  completedAt: z.string().datetime().nullable(),
+  verdicts: z.array(VerdictWithEvidenceSchema),
+});
+export type GetAnalysisResponse = z.infer<typeof GetAnalysisResponseSchema>;
