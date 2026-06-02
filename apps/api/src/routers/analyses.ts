@@ -1,5 +1,3 @@
-import { presignUploadUrl, suspectObjectKey } from "@/s3";
-import { publicProcedure, router } from "@/trpc";
 import {
   AnalyzeSuspectJobSchema,
   ConfirmAnalysisUploadInputSchema,
@@ -10,6 +8,9 @@ import {
   GetAnalysisResponseSchema,
 } from "@repo/schemas";
 import { TRPCError } from "@trpc/server";
+
+import { presignUploadUrl, suspectObjectKey } from "@/s3";
+import { publicProcedure, router } from "@/trpc";
 
 export const analysesRouter = router({
   create: publicProcedure
