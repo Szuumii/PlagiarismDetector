@@ -1,25 +1,55 @@
-// M2 stub: ignores suspectText and returns the first k indexed Documents
-// with a synthetic descending score. M4 replaces the body with parallel
-// vector + BM25 + RRF fusion; signature stays stable.
+import { bm25Search } from "./bm25";
+import { embed } from "./embeddings";
+import { searchVector } from "./vector-index";
 
-import { db } from "@repo/db";
-
-export interface SearchHit {
+export interface RetrievalHit {
+  chunkId: string;
   documentId: string;
   score: number;
 }
 
+const RRF_K = 60;
+const CANDIDATE_MULTIPLIER = 3;
+
+interface RankedHit {
+  chunkId: string;
+  documentId: string;
+}
+
+function rrfFuse(lists: RankedHit[][], k: number): RetrievalHit[] {
+  const scores = new Map<string, RetrievalHit>();
+  for (const list of lists) {
+    for (let i = 0; i < list.length; i++) {
+      const hit = list[i];
+      const contribution = 1 / (RRF_K + i + 1);
+      const existing = scores.get(hit.chunkId);
+      if (existing) {
+        existing.score += contribution;
+      } else {
+        scores.set(hit.chunkId, {
+          chunkId: hit.chunkId,
+          documentId: hit.documentId,
+          score: contribution,
+        });
+      }
+    }
+  }
+  return [...scores.values()]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k);
+}
+
 export async function hybridSearch(
-  _suspectText: string,
+  query: string,
   k: number,
-): Promise<SearchHit[]> {
-  const documents = await db.document.findMany({
-    where: { status: "indexed" },
-    take: k,
-    select: { id: true },
-  });
-  return documents.map((doc, i) => ({
-    documentId: doc.id,
-    score: 1 - i * 0.05,
-  }));
+): Promise<RetrievalHit[]> {
+  const [queryEmbedding] = await embed([query]);
+  const candidateK = k * CANDIDATE_MULTIPLIER;
+
+  const [vector, lexical] = await Promise.all([
+    searchVector(queryEmbedding, candidateK),
+    bm25Search(query, candidateK),
+  ]);
+
+  return rrfFuse([vector, lexical], k);
 }
