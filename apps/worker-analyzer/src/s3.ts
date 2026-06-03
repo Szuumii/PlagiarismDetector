@@ -9,13 +9,12 @@ const bucket = requireEnv("S3_BUCKET");
 
 export const s3 = new S3Client({ region });
 
-export async function getObjectBody(key: string): Promise<Buffer> {
+export async function getObjectBody(key: string): Promise<Uint8Array> {
   const response = await s3.send(
     new GetObjectCommand({ Bucket: bucket, Key: key }),
   );
   if (!response.Body) {
     throw new Error(`S3 GetObject returned no body for key: ${key}`);
   }
-  const bytes = await response.Body.transformToByteArray();
-  return Buffer.from(bytes);
+  return await response.Body.transformToByteArray();
 }

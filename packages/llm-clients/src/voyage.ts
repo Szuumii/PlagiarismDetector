@@ -6,10 +6,16 @@ export const VOYAGE_EMBEDDING_DIM = 1024;
 const VOYAGE_API_URL = "https://api.voyageai.com/v1/embeddings";
 const VOYAGE_BATCH_LIMIT = 128;
 const VOYAGE_API_KEY = requireEnv("VOYAGE_API_KEY");
-const VOYAGE_RPM = 3;
+// Voyage's tier limit is 3 RPM (20s exactly). Pace at 30s to leave headroom
+// for clock skew, network jitter, and any other processes sharing the key.
+const VOYAGE_CALL_INTERVAL_MS = 30_000;
 
 const MAX_RETRIES = 2;
-const BACKOFF_BASE_MS = 500;
+// Voyage enforces 3 RPM on a strict 60s rolling window. A 429 means we have to
+// wait long enough for an in-window call to age out — short exponential backoff
+// (sub-second) just burns retry budget against the same closed window.
+const RATE_LIMIT_BACKOFF_MS = 30_000;
+const SERVER_ERROR_BACKOFF_MS = 1_000;
 
 export type VoyageInputType = "document" | "query";
 
@@ -54,17 +60,26 @@ class RateLimiter {
 
     if (this.tokens >= 1) {
       this.tokens -= 1;
+      console.log(
+        `[voyage:limiter] token acquired (remaining=${this.tokens.toFixed(2)})`,
+      );
       return;
     }
 
     const waitMs = Math.ceil((1 - this.tokens) / this.refillPerMs);
+    console.log(
+      `[voyage:limiter] waiting ${waitMs}ms for token (current=${this.tokens.toFixed(2)})`,
+    );
     await wait(waitMs);
     this.tokens = 0;
     this.lastRefill = Date.now();
   }
 }
 
-const limiter = new RateLimiter(VOYAGE_RPM, VOYAGE_RPM / 60_000);
+// burst=1 means no initial burst; first call instant, every subsequent call
+// waits VOYAGE_CALL_INTERVAL_MS. refillPerMs = 1 / interval so that one token
+// regenerates over exactly that interval.
+const limiter = new RateLimiter(1, 1 / VOYAGE_CALL_INTERVAL_MS);
 
 interface VoyageEmbeddingDatum {
   embedding: number[];
@@ -91,6 +106,11 @@ async function fetchWithRetry(body: unknown): Promise<VoyageEmbeddingResponse> {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     await limiter.acquire();
 
+    const requestStart = Date.now();
+    console.log(
+      `[voyage:fetch] attempt ${attempt + 1}/${MAX_RETRIES + 1} firing`,
+    );
+
     let res: Response;
     try {
       res = await fetch(VOYAGE_API_URL, {
@@ -103,10 +123,18 @@ async function fetchWithRetry(body: unknown): Promise<VoyageEmbeddingResponse> {
       });
     } catch (err) {
       lastError = err;
+      console.log(
+        `[voyage:fetch] network error after ${Date.now() - requestStart}ms: ${String(err)}`,
+      );
       if (attempt === MAX_RETRIES) break;
-      await wait(BACKOFF_BASE_MS * 2 ** attempt);
+      const backoff = SERVER_ERROR_BACKOFF_MS * 2 ** attempt;
+      console.log(`[voyage:fetch] backing off ${backoff}ms before retry`);
+      await wait(backoff);
       continue;
     }
+
+    const elapsed = Date.now() - requestStart;
+    console.log(`[voyage:fetch] status=${res.status} elapsed=${elapsed}ms`);
 
     if (res.ok) {
       return (await res.json()) as VoyageEmbeddingResponse;
@@ -117,18 +145,31 @@ async function fetchWithRetry(body: unknown): Promise<VoyageEmbeddingResponse> {
     lastError = new Error(errMsg);
 
     if (res.status === 429) {
+      const retryAfterRaw = res.headers.get("retry-after");
+      const retryAfter = parseRetryAfter(retryAfterRaw);
+      const backoff = retryAfter ?? RATE_LIMIT_BACKOFF_MS * 2 ** attempt;
+      console.log(`[voyage:fetch] 429 body: ${errText || "(empty)"}`);
+      console.log(
+        `[voyage:fetch] Retry-After header: ${retryAfterRaw ?? "(none)"}, applying ${backoff}ms backoff`,
+      );
       if (attempt === MAX_RETRIES) break;
-      const retryAfter = parseRetryAfter(res.headers.get("retry-after"));
-      await wait(retryAfter ?? BACKOFF_BASE_MS * 2 ** attempt);
+      await wait(backoff);
       continue;
     }
 
     if (res.status >= 500) {
+      const backoff = SERVER_ERROR_BACKOFF_MS * 2 ** attempt;
+      console.log(
+        `[voyage:fetch] ${res.status} body: ${errText || "(empty)"}, backing off ${backoff}ms`,
+      );
       if (attempt === MAX_RETRIES) break;
-      await wait(BACKOFF_BASE_MS * 2 ** attempt);
+      await wait(backoff);
       continue;
     }
 
+    console.log(
+      `[voyage:fetch] ${res.status} (non-retryable) body: ${errText || "(empty)"}`,
+    );
     throw new Error(errMsg);
   }
 
@@ -180,8 +221,14 @@ export async function embed(
   }
 
   const embeddings: number[][] = [];
+  const totalBatches = Math.ceil(texts.length / VOYAGE_BATCH_LIMIT);
   for (let i = 0; i < texts.length; i += VOYAGE_BATCH_LIMIT) {
     const batch = texts.slice(i, i + VOYAGE_BATCH_LIMIT);
+    const batchIdx = Math.floor(i / VOYAGE_BATCH_LIMIT) + 1;
+    const remainingAfter = texts.length - (i + batch.length);
+    console.log(
+      `[voyage] batch ${batchIdx}/${totalBatches}: ${batch.length} chunks (${remainingAfter} remaining)`,
+    );
     const result = await batchEmbed(batch, model, options.inputType);
     embeddings.push(...result);
   }

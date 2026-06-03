@@ -64,7 +64,7 @@ model Document {
   filename    String
   s3Key       String
   status      DocumentStatus @default(pending)
-  contentHash String?        @unique
+  contentHash String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 

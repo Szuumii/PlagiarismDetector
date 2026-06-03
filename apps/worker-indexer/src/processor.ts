@@ -2,6 +2,7 @@ import { chunk, embed, EMBED_MODEL, extractText } from "@repo/core";
 import { db } from "@repo/db";
 import { IndexDocumentJobSchema, type IndexDocumentJob } from "@repo/schemas";
 import type { Job } from "bullmq";
+import { createHash } from "crypto"
 
 import { getObjectBody } from "./s3";
 
@@ -18,8 +19,12 @@ export async function processIndexDocument(
   });
 
   const buffer = await getObjectBody(objectKey);
+  const documentHash = sha256(buffer)
   const text = await extractText(buffer);
-  const textChunks = chunk(text);
+  const textChunks = chunk(text).map((c) => ({
+    ...c,
+    contentHash: sha256(c.content),
+  }));
 
   const persistedChunks = [];
   for (const c of textChunks) {
@@ -29,11 +34,11 @@ export async function processIndexDocument(
         documentId,
         chunkIdx: c.chunkIdx,
         content: c.content,
-        contentHash: `fake-${documentId}-${c.chunkIdx}`,
+        contentHash: c.contentHash,
       },
       update: {
         content: c.content,
-        contentHash: `fake-${documentId}-${c.chunkIdx}`,
+        contentHash: c.contentHash,
       },
     });
     persistedChunks.push(persisted);
@@ -41,7 +46,7 @@ export async function processIndexDocument(
 
   await db.document.update({
     where: { id: documentId },
-    data: { status: "embedding" },
+    data: { status: "embedding", contentHash: documentHash },
   });
 
   const vectors = await embed(textChunks.map((c) => c.content));
@@ -67,4 +72,8 @@ export async function processIndexDocument(
   console.log(
     `[indexer] done documentId=${documentId} chunks=${persistedChunks.length}`,
   );
+}
+
+function sha256(input: string | Uint8Array): string {
+  return createHash('sha256').update(input).digest('hex')
 }
