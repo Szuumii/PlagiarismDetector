@@ -77,12 +77,13 @@ model Chunk {
   documentId  String
   chunkIdx    Int
   content     String
-  contentHash String @unique
+  contentHash String
 
   document  Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
   embedding Embedding?
 
   @@unique([documentId, chunkIdx])
+  @@unique([documentId, contentHash])
   @@index([documentId])
 }
 
