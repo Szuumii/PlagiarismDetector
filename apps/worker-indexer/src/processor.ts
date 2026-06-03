@@ -2,7 +2,6 @@ import { chunk, embed, EMBED_MODEL, extractText } from "@repo/core";
 import { db } from "@repo/db";
 import { IndexDocumentJobSchema, type IndexDocumentJob } from "@repo/schemas";
 import type { Job } from "bullmq";
-import { createHash } from "crypto"
 
 import { getObjectBody } from "./s3";
 
@@ -19,12 +18,8 @@ export async function processIndexDocument(
   });
 
   const buffer = await getObjectBody(objectKey);
-  const documentHash = sha256(buffer)
   const text = await extractText(buffer);
-  const textChunks = chunk(text).map((c) => ({
-    ...c,
-    contentHash: sha256(c.content),
-  }));
+  const textChunks = chunk(text);
 
   const persistedChunks = [];
   for (const c of textChunks) {
@@ -34,11 +29,9 @@ export async function processIndexDocument(
         documentId,
         chunkIdx: c.chunkIdx,
         content: c.content,
-        contentHash: c.contentHash,
       },
       update: {
         content: c.content,
-        contentHash: c.contentHash,
       },
     });
     persistedChunks.push(persisted);
@@ -46,22 +39,38 @@ export async function processIndexDocument(
 
   await db.document.update({
     where: { id: documentId },
-    data: { status: "embedding", contentHash: documentHash },
+    data: { status: "embedding" },
   });
 
-  const vectors = await embed(textChunks.map((c) => c.content));
+  const existingEmbeddings = await db.embedding.findMany({
+    where: { chunk: { documentId } },
+    select: { chunkId: true },
+  });
+  const embeddedChunkIds = new Set(existingEmbeddings.map((e) => e.chunkId));
+  const needEmbedding = persistedChunks.filter(
+    (c) => !embeddedChunkIds.has(c.id),
+  );
 
-  for (let i = 0; i < persistedChunks.length; i++) {
-    const chunkRow = persistedChunks[i];
-    const vector = vectors[i];
-    const vectorLiteral = `[${vector.join(",")}]`;
+  if (needEmbedding.length === 0) {
+    console.log(`[indexer] all chunks already embedded, skipping Mistral`);
+  } else {
+    console.log(
+      `[indexer] embedding ${needEmbedding.length} chunks via Mistral`,
+    );
+    const vectors = await embed(needEmbedding.map((c) => c.content));
 
-    await db.$executeRaw`
-      INSERT INTO "Embedding" (id, "chunkId", vector, model)
-      VALUES (gen_random_uuid(), ${chunkRow.id}, ${vectorLiteral}::vector, ${EMBED_MODEL})
-      ON CONFLICT ("chunkId") DO UPDATE
-        SET vector = EXCLUDED.vector, model = EXCLUDED.model
-    `;
+    for (let i = 0; i < needEmbedding.length; i++) {
+      const chunkRow = needEmbedding[i];
+      const vector = vectors[i];
+      const vectorLiteral = `[${vector.join(",")}]`;
+
+      await db.$executeRaw`
+        INSERT INTO "Embedding" (id, "chunkId", vector, model)
+        VALUES (gen_random_uuid(), ${chunkRow.id}, ${vectorLiteral}::vector, ${EMBED_MODEL})
+        ON CONFLICT ("chunkId") DO UPDATE
+          SET vector = EXCLUDED.vector, model = EXCLUDED.model
+      `;
+    }
   }
 
   await db.document.update({
@@ -72,8 +81,4 @@ export async function processIndexDocument(
   console.log(
     `[indexer] done documentId=${documentId} chunks=${persistedChunks.length}`,
   );
-}
-
-function sha256(input: string | Uint8Array): string {
-  return createHash('sha256').update(input).digest('hex')
 }

@@ -59,31 +59,28 @@ model Org {
 }
 
 model Document {
-  id          String         @id @default(uuid())
-  title       String
-  filename    String
-  s3Key       String
-  status      DocumentStatus @default(pending)
-  contentHash String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id        String         @id @default(uuid())
+  title     String
+  filename  String
+  s3Key     String
+  status    DocumentStatus @default(pending)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   chunks   Chunk[]
   verdicts Verdict[]
 }
 
 model Chunk {
-  id          String @id @default(uuid())
-  documentId  String
-  chunkIdx    Int
-  content     String
-  contentHash String
+  id         String @id @default(uuid())
+  documentId String
+  chunkIdx   Int
+  content    String
 
   document  Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
   embedding Embedding?
 
   @@unique([documentId, chunkIdx])
-  @@unique([documentId, contentHash])
   @@index([documentId])
 }
 
