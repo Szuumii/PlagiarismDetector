@@ -93,21 +93,41 @@ The riskiest "boring" milestone. The whole architecture rests on the `AppRouter`
 
 ---
 
-## M3 — Real ingestion: PDF extract + chunking + Voyage embeddings
+## M3 — Real ingestion: PDF extract + chunking + Mistral embeddings
+
+> **Progress — updated 2026-06-03: M3 COMPLETE — real ingestion working end-to-end with Mistral.** Pivoted from Voyage to Mistral mid-milestone after Voyage's free tier (3 RPM + 10K TPM, where the TPM cap is the binding constraint at our chunk sizes) made even single-PDF indexing unworkable. Mistral's free tier (6 RPS, 500K tokens/month) handles real PDFs without pacing. The provider swap is encapsulated entirely in `packages/llm-clients/src/mistral.ts` + a one-line import change in `packages/core/src/embeddings.ts`; no API/worker/schema code touched.
+>
+> **What landed:**
+> - **`packages/core/pdf.ts`**: real `unpdf` extraction via `extractText(buffer, { mergePages: true })`, whitespace normalization (`\r\n? → \n`, collapse `\n{3,}` → `\n\n`), and tail-only References/Bibliography stripping (regex `/^\s*(references|bibliography|works cited)\s*$/gim`, strips only if the *last* match falls past the 70% position mark — avoids false positives on body-text mentions).
+> - **`packages/core/chunking.ts`**: paragraph split on `\n{2,}`, drop fragments < 40 chars, sentence-fallback (`(?<=[.!?])\s+`) for paragraphs > 2000 chars with greedy merge targeting 1500 chars/chunk. Oversize single sentences pass through solo (no sub-sentence splits).
+> - **`packages/llm-clients/src/mistral.ts`**: `POST /v1/embeddings` against `mistral-embed` (1024 dim, matches schema), 128-input batching, dim assertion at the response boundary, exhaustive diagnostic logging (`[mistral:fetch]` per attempt + `[voyage:limiter]`-style state), 429/5xx retry with `Retry-After` honor + exponential backoff. No rate limiter — Mistral free tier is generous enough that pacing is unnecessary; the retry loop handles any 429 defensively.
+> - **`apps/worker-indexer/src/s3.ts`** (+ analyzer duplicate): dropped `Buffer.from(bytes)` wrap, now returns `Uint8Array` directly. Closes Node/Prisma deprecation warnings about Buffer-vs-Uint8Array.
+> - **`apps/worker-indexer/src/processor.ts`**: real ingestion path with **Chunk-ID based skip-already-embedded** for retry idempotency. `db.embedding.findMany({ where: { chunk: { documentId } } })` finds which chunks already have vectors; subsequent runs filter `needEmbedding = persistedChunks.filter(c => !embeddedChunkIds.has(c.id))` and skip the Mistral call entirely when zero are needed. The smoking-gun log line `[indexer] all chunks already embedded, skipping Mistral` confirms the path fires on retry.
+>
+> **Sidequest: Voyage rate-limiter exploration (now removed).** Spent meaningful time on a token-bucket rate limiter for Voyage's 3 RPM cap — burst calibration, promise-chain mutex for concurrent acquires, sliding-window vs token-bucket tradeoffs, 30s call interval to leave headroom against strict 60s window enforcement. Worked correctly but couldn't address the TPM ceiling. All scrapped when we moved to Mistral. The lesson worth keeping: **free-tier rate limits are usually engineered to be unusable for anything real** — they're gates, not tiers.
+>
+> **Schema work that landed and was then removed.** Followed the "real `contentHash` on Document + Chunk" plan through three migrations: (1) Chunk.contentHash `@unique` → `@@unique([documentId, contentHash])` to allow cross-document content overlap; (2) drop `@unique` from Document.contentHash to allow re-uploading the same PDF; (3) **drop both `contentHash` columns entirely** when we recognized they were forward-compatibility infrastructure for Phase 2 cross-doc embedding cache + upload-time dedup — neither of which is in M3 scope. The active retry-idempotency win (skip-already-embedded) uses `Chunk.id` not `contentHash`, so removing the columns didn't regress anything observable. Phase 2 will re-add when actually needed.
+>
+> **Deferred to M4 / Phase 2:**
+> - Content-hash columns + cross-doc embedding cache + upload-time document dedup.
+> - HNSW vector index (lands with real retrieval).
+> - tiktoken-aware chunk sizing (char-count proxy is adequate at our scales).
+> - OCR fallback for scanned-image PDFs.
+> - `unpdf` Docker compatibility check.
 
 **Tasks**
-- [ ] `packages/core/pdf.ts`: `extractText` via `unpdf`, strip trailing References/Bibliography block.
-- [ ] `packages/core/chunking.ts`: paragraph split with sentence-level fallback for long paragraphs.
-- [ ] `packages/core/embeddings.ts` + `voyage.ts`: `voyage-3-large`, `input_type: "document"`, batched `fetch`, returns `number[][]`. **Assert `embedding.length === 1024`** before insert (Voyage output dim is configurable; a mismatch throws on the `vector(1024)` insert).
-- [ ] Real `contentHash` on Document + Chunk; **skip the Voyage call entirely** when a Chunk/Embedding with that hash already exists (makes retries cheap *and* idempotent).
-- [ ] Rate limiting: token-bucket **inside `voyage.ts`** (one index job makes N calls; the BullMQ limiter only throttles job *starts*, not internal API calls). BullMQ worker `limiter: { max: 3, duration: 60000 }` is the secondary guard.
+- [x] `packages/core/pdf.ts`: `extractText` via `unpdf`, strip trailing References/Bibliography block.
+- [x] `packages/core/chunking.ts`: paragraph split with sentence-level fallback for long paragraphs.
+- [x] `packages/core/embeddings.ts` + ~~`voyage.ts`~~ `mistral.ts`: real client, batched `fetch`, returns `number[][]`. Dim asserted at response boundary. (**Provider pivoted from Voyage to Mistral** — see progress note.)
+- [x] ~~Real `contentHash` on Document + Chunk; skip the Voyage call entirely when a Chunk/Embedding with that hash already exists~~ → **Slimmed to skip-already-embedded via `Chunk.id` lookup** (Phase 2 substrate scrapped).
+- [x] ~~Rate limiting: token-bucket inside `voyage.ts`~~ → Removed with the Mistral pivot. Free-tier Mistral doesn't require pacing; retry loop handles 429s defensively.
 
 **Exit criteria**
-- A real academic PDF indexes end-to-end; Embedding rows hold genuine 1024-dim vectors.
-- Re-indexing the same PDF skips all rows (hash hits) and makes no Voyage calls.
-- The in-client limiter visibly paces requests without failing the job.
+- A real academic PDF indexes end-to-end; Embedding rows hold genuine 1024-dim vectors. ✓
+- Re-indexing the same documentId skips all rows and makes no Mistral calls. ✓ (via Chunk-ID skip, not content-hash)
+- ~~The in-client limiter visibly paces requests without failing the job.~~ N/A — limiter removed.
 
-**Key files:** `packages/core/{pdf,chunking,embeddings}.ts`, `packages/llm-clients/voyage.ts`.
+**Key files:** `packages/core/{pdf,chunking,embeddings}.ts`, `packages/llm-clients/src/mistral.ts`, `apps/worker-indexer/src/processor.ts`, `apps/worker-indexer/src/s3.ts`.
 
 ---
 
