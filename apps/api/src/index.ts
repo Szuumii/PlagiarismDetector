@@ -5,6 +5,8 @@ import Fastify from "fastify";
 import { createContext } from "./context";
 import { appRouter } from "./router";
 
+export type { AppRouter } from "./router";
+
 const server = Fastify({ logger: true });
 
 await server.register(cors, { origin: true });

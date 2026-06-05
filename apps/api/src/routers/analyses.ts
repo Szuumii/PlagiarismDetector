@@ -1,7 +1,16 @@
+import {
+  AnalyzeSuspectJobSchema,
+  ConfirmAnalysisUploadInputSchema,
+  ConfirmAnalysisUploadResponseSchema,
+  CreateAnalysisInputSchema,
+  CreateAnalysisResponseSchema,
+  GetAnalysisInputSchema,
+  GetAnalysisResponseSchema,
+} from "@repo/schemas";
+import { TRPCError } from "@trpc/server";
+
 import { presignUploadUrl, suspectObjectKey } from "@/s3";
 import { publicProcedure, router } from "@/trpc";
-import { AnalyzeSuspectJobSchema, ConfirmAnalysisUploadInputSchema, ConfirmAnalysisUploadResponseSchema, CreateAnalysisInputSchema, CreateAnalysisResponseSchema } from "@repo/schemas";
-import { TRPCError } from "@trpc/server";
 
 export const analysesRouter = router({
   create: publicProcedure
@@ -40,6 +49,17 @@ export const analysesRouter = router({
         });
       }
 
+      const existing = await ctx.db.analysisJob.findFirst({
+        where: {
+          suspectId: suspect.id,
+          orgId: ctx.orgId,
+          status: { in: ["pending", "parsing", "searching", "judging"] },
+        },
+      })
+      if (existing) {
+        return { analysisJobId: existing.id }
+      }
+
       const [updatedSuspect, analysisJob] = await ctx.db.$transaction([
         ctx.db.suspect.update({ data: { status: 'uploaded' }, where: { id: suspect.id } }),
         ctx.db.analysisJob.create({
@@ -58,5 +78,49 @@ export const analysesRouter = router({
       })
 
       return { analysisJobId: analysisJob.id }
-    })
+    }),
+  get: publicProcedure
+    .input(GetAnalysisInputSchema)
+    .output(GetAnalysisResponseSchema)
+    .query(async ({ ctx, input }) => {
+      const job = await ctx.db.analysisJob.findUnique({
+        where: { id: input.analysisJobId, orgId: ctx.orgId },
+        include: {
+          verdicts: {
+            include: {
+              evidence: { orderBy: { pairIndex: "asc" } },
+            },
+          },
+        },
+      });
+
+      if (!job) {
+        throw new TRPCError({
+          code: "UNPROCESSABLE_CONTENT",
+          message: `No analysis with id ${input.analysisJobId}`,
+        });
+      }
+
+      return {
+        id: job.id,
+        status: job.status,
+        error: job.error,
+        startedAt: job.startedAt?.toISOString() ?? null,
+        completedAt: job.completedAt?.toISOString() ?? null,
+        verdicts: job.verdicts.map((v) => ({
+          id: v.id,
+          candidateDocId: v.candidateDocId,
+          label: v.label,
+          confidence: v.confidence,
+          reasoning: v.reasoning,
+          searchScore: v.searchScore,
+          evidence: v.evidence.map((e) => ({
+            pairIndex: e.pairIndex,
+            suspectText: e.suspectText,
+            sourceText: e.sourceText,
+            note: e.note,
+          })),
+        })),
+      };
+    }),
 })
