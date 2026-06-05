@@ -1,9 +1,8 @@
 import { chunk, embed, EMBED_MODEL, extractText } from "@repo/core";
 import { db } from "@repo/db";
 import { IndexDocumentJobSchema, type IndexDocumentJob } from "@repo/schemas";
+import { storage } from "@repo/storage";
 import type { Job } from "bullmq";
-
-import { getObjectBody } from "./s3";
 
 export async function processIndexDocument(
   job: Job<IndexDocumentJob>,
@@ -17,7 +16,7 @@ export async function processIndexDocument(
     data: { status: "parsing" },
   });
 
-  const buffer = await getObjectBody(objectKey);
+  const buffer = await storage.getObject(objectKey);
   const text = await extractText(buffer);
   const textChunks = chunk(text);
 
