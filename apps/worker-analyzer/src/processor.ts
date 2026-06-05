@@ -1,10 +1,10 @@
 import { extractText, hybridSearch, judge } from "@repo/core";
 import { db } from "@repo/db";
 import { AnalyzeSuspectJobSchema, type AnalyzeSuspectJob } from "@repo/schemas";
+import { storage } from "@repo/storage";
 import type { Job } from "bullmq";
 
 import { publishVerdict } from "./pubsub";
-import { getObjectBody } from "./s3";
 
 export async function processAnalyzeSuspect(job: Job<AnalyzeSuspectJob>): Promise<void> {
   const { orgId, analysisJobId, objectKey } = AnalyzeSuspectJobSchema.parse(job.data);
@@ -12,7 +12,7 @@ export async function processAnalyzeSuspect(job: Job<AnalyzeSuspectJob>): Promis
 
   await db.analysisJob.update({ where: { id: analysisJobId }, data: { status: "parsing", startedAt: new Date() } })
 
-  const buffer = await getObjectBody(objectKey);
+  const buffer = await storage.getObject(objectKey);
   const suspectText = await extractText(buffer);
 
   await db.analysisJob.update({
