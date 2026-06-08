@@ -12,9 +12,8 @@ const orgName = process.env.DEFAULT_ORG_NAME ?? "Default Organization";
 const orgSlug = process.env.DEFAULT_ORG_SLUG ?? "default";
 
 async function main() {
-
   if (!orgId) {
-    throw new Error("DEFAULT_ORG_ID env var is not set")
+    throw new Error("DEFAULT_ORG_ID env var is not set");
   }
 
   await db.org.upsert({
@@ -24,8 +23,8 @@ async function main() {
       id: orgId,
       name: orgName,
       slug: orgSlug,
-    }
-  })
+    },
+  });
 }
 main()
   .then(async () => {

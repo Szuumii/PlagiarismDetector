@@ -55,7 +55,10 @@ class RateLimiter {
   private async consume(): Promise<void> {
     const now = Date.now();
     const elapsed = now - this.lastRefill;
-    this.tokens = Math.min(this.burst, this.tokens + elapsed * this.refillPerMs);
+    this.tokens = Math.min(
+      this.burst,
+      this.tokens + elapsed * this.refillPerMs,
+    );
     this.lastRefill = now;
 
     if (this.tokens >= 1) {

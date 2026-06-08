@@ -5,11 +5,9 @@ import { Worker } from "bullmq";
 import { processAnalyzeSuspect } from "./processor";
 import { connection, QUEUE_NAMES } from "./queues";
 
-const worker = new Worker(
-  QUEUE_NAMES.analyzeSuspect,
-  processAnalyzeSuspect,
-  { connection },
-);
+const worker = new Worker(QUEUE_NAMES.analyzeSuspect, processAnalyzeSuspect, {
+  connection,
+});
 
 worker.on("completed", (job) => {
   console.log(`[analyzer] completed jobId=${job.id}`);

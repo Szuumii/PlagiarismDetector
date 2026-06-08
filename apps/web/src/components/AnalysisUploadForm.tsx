@@ -10,7 +10,9 @@ export interface AnalysisUploadFormProps {
   onAnalysisStarted: (analysisJobId: string) => void;
 }
 
-export function AnalysisUploadForm({ onAnalysisStarted }: AnalysisUploadFormProps) {
+export function AnalysisUploadForm({
+  onAnalysisStarted,
+}: AnalysisUploadFormProps) {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);

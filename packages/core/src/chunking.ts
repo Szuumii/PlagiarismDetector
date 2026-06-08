@@ -11,7 +11,9 @@ export interface Chunk {
 }
 
 function splitLongParagraph(paragraph: string): string[] {
-  const sentences = paragraph.split(SENTENCE_BOUNDARY).filter((s) => s.length > 0);
+  const sentences = paragraph
+    .split(SENTENCE_BOUNDARY)
+    .filter((s) => s.length > 0);
   const merged: string[] = [];
   let buffer = "";
 
@@ -39,7 +41,9 @@ export function chunk(text: string): Chunk[] {
     if (paragraph.length < MIN_CHARS) continue;
 
     const pieces =
-      paragraph.length <= MAX_CHARS ? [paragraph] : splitLongParagraph(paragraph);
+      paragraph.length <= MAX_CHARS
+        ? [paragraph]
+        : splitLongParagraph(paragraph);
 
     for (const piece of pieces) {
       const trimmed = piece.trim();

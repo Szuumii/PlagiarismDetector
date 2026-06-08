@@ -1,6 +1,7 @@
 import { extractText as unpdfExtract } from "unpdf";
 
-const REFERENCES_TAIL_PATTERN = /^\s*(references|bibliography|works cited)\s*$/gim;
+const REFERENCES_TAIL_PATTERN =
+  /^\s*(references|bibliography|works cited)\s*$/gim;
 const TAIL_POSITION_THRESHOLD = 0.7;
 
 function normalizeWhitespace(text: string): string {

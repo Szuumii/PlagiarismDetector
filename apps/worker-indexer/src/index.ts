@@ -5,11 +5,9 @@ import { Worker } from "bullmq";
 import { processIndexDocument } from "./processor";
 import { connection, QUEUE_NAMES } from "./queues";
 
-const worker = new Worker(
-  QUEUE_NAMES.indexDocument,
-  processIndexDocument,
-  { connection },
-);
+const worker = new Worker(QUEUE_NAMES.indexDocument, processIndexDocument, {
+  connection,
+});
 
 worker.on("completed", (job) => {
   console.log(`[indexer] completed jobId=${job.id}`);

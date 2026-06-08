@@ -11,15 +11,15 @@ Academic plagiarism detection pipeline built on TypeScript. Upload reference PDF
 
 ## Stack
 
-| Layer | Technology |
-|---|---|
-| API | Fastify + tRPC v11 |
-| Frontend | React + Vite + React Router |
-| Queue | BullMQ + Redis |
-| Database | Postgres + pgvector (Prisma) |
-| Object storage | AWS S3 |
-| Embeddings | Voyage `voyage-3-large` |
-| Judge | Anthropic Claude (tool-use) |
+| Layer          | Technology                   |
+| -------------- | ---------------------------- |
+| API            | Fastify + tRPC v11           |
+| Frontend       | React + Vite + React Router  |
+| Queue          | BullMQ + Redis               |
+| Database       | Postgres + pgvector (Prisma) |
+| Object storage | AWS S3                       |
+| Embeddings     | Voyage `voyage-3-large`      |
+| Judge          | Anthropic Claude (tool-use)  |
 
 Monorepo managed with npm workspaces + Turborepo.
 

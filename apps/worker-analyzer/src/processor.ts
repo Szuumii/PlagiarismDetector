@@ -6,11 +6,18 @@ import type { Job } from "bullmq";
 
 import { publishVerdict } from "./pubsub";
 
-export async function processAnalyzeSuspect(job: Job<AnalyzeSuspectJob>): Promise<void> {
-  const { orgId, analysisJobId, objectKey } = AnalyzeSuspectJobSchema.parse(job.data);
+export async function processAnalyzeSuspect(
+  job: Job<AnalyzeSuspectJob>,
+): Promise<void> {
+  const { orgId, analysisJobId, objectKey } = AnalyzeSuspectJobSchema.parse(
+    job.data,
+  );
   console.log(`[analyzer] start analysisJobId=${analysisJobId}`);
 
-  await db.analysisJob.update({ where: { id: analysisJobId }, data: { status: "parsing", startedAt: new Date() } })
+  await db.analysisJob.update({
+    where: { id: analysisJobId },
+    data: { status: "parsing", startedAt: new Date() },
+  });
 
   const buffer = await storage.getObject(objectKey);
   const suspectText = await extractText(buffer);
@@ -47,7 +54,9 @@ export async function processAnalyzeSuspect(job: Job<AnalyzeSuspectJob>): Promis
     });
 
     if (!candidate) {
-      console.warn(`[analyzer] candidate ${hit.documentId} not found; skipping`);
+      console.warn(
+        `[analyzer] candidate ${hit.documentId} not found; skipping`,
+      );
       continue;
     }
 

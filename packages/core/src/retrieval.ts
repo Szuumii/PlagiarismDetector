@@ -34,9 +34,7 @@ function rrfFuse(lists: RankedHit[][], k: number): RetrievalHit[] {
       }
     }
   }
-  return [...scores.values()]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, k);
+  return [...scores.values()].sort((a, b) => b.score - a.score).slice(0, k);
 }
 
 export async function hybridSearch(

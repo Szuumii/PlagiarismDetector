@@ -32,5 +32,3 @@ export async function searchVector(
     LIMIT ${k}
   `;
 }
-
-

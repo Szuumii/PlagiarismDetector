@@ -31,8 +31,8 @@ export function AnalysisResults({ analysisJobId }: AnalysisResultsProps) {
   return (
     <div>
       <p>
-        <strong>Analysis</strong>{" "}
-        <code>{analysisJobId.slice(0, 8)}…</code> — status:{" "}
+        <strong>Analysis</strong> <code>{analysisJobId.slice(0, 8)}…</code> —
+        status:{" "}
         <span className={status === "failed" ? "error" : "status-done"}>
           {status}
         </span>
@@ -51,8 +51,8 @@ export function AnalysisResults({ analysisJobId }: AnalysisResultsProps) {
         verdicts.map((v) => (
           <div key={v.id} className="verdict">
             <p>
-              <strong>{v.label}</strong> · confidence {v.confidence.toFixed(2)} ·
-              searchScore {v.searchScore.toFixed(2)}
+              <strong>{v.label}</strong> · confidence {v.confidence.toFixed(2)}{" "}
+              · searchScore {v.searchScore.toFixed(2)}
             </p>
             <p>
               against doc <code>{v.candidateDocId.slice(0, 8)}…</code>

@@ -43,10 +43,7 @@ export async function rebuildBM25Index(): Promise<void> {
   return pendingRebuild;
 }
 
-export async function bm25Search(
-  query: string,
-  k: number,
-): Promise<BM25Hit[]> {
+export async function bm25Search(query: string, k: number): Promise<BM25Hit[]> {
   if (!cachedIndex) await rebuildBM25Index();
   if (!cachedIndex) return []; // rebuild returned no chunks → empty corpus
 

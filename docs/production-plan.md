@@ -110,20 +110,33 @@ EvidencePair  id, verdictId, pairIndex, suspectPassage, libraryPassage,
 // verdict.ts
 export const VerdictSchema = z.object({
   verdict: z.enum(["plagiarism", "suspicious", "legitimate_reuse", "no_match"]),
-  plagiarism_type: z.enum(["verbatim", "light_paraphrase", "heavy_paraphrase",
-                           "structural_mimicry", "none"]),
+  plagiarism_type: z.enum([
+    "verbatim",
+    "light_paraphrase",
+    "heavy_paraphrase",
+    "structural_mimicry",
+    "none",
+  ]),
   confidence: z.number().min(0).max(1),
   explanation: z.string(),
-  evidence_annotations: z.array(z.object({
-    pair_index: z.number().int(),
-    supports_verdict: z.boolean(),
-    note: z.string(),
-  })),
+  evidence_annotations: z.array(
+    z.object({
+      pair_index: z.number().int(),
+      supports_verdict: z.boolean(),
+      note: z.string(),
+    }),
+  ),
 });
 
 // job-payloads.ts — BullMQ job data
-export const IndexDocumentJobSchema = z.object({ documentId: z.string(), orgId: z.string() });
-export const AnalyzeSuspectJobSchema = z.object({ analysisJobId: z.string(), orgId: z.string() });
+export const IndexDocumentJobSchema = z.object({
+  documentId: z.string(),
+  orgId: z.string(),
+});
+export const AnalyzeSuspectJobSchema = z.object({
+  analysisJobId: z.string(),
+  orgId: z.string(),
+});
 ```
 
 The same `VerdictSchema` is used to:
@@ -165,7 +178,7 @@ Static single-page app — **no server runtime**. Vite builds it to static asset
 - `/libraries/:id` — admin view. Document list with status pills, drag-drop upload, deletion.
 - `/analyze` — suspect upload form. On submit: presigned upload → `confirmUpload` → navigate to result route.
 - `/analyses/:id` — result page. Subscribes to `analyses.subscribe` over tRPC (SSE via `httpSubscriptionLink`); renders candidate cards as verdicts arrive. Layout mirrors the prototype's HTML report (candidate cards ordered by severity, evidence-pair tables, verdict badges).
-- Uses the `@trpc/react-query` client and imports the `AppRouter` *type* from `apps/api` — full end-to-end type safety, no codegen step.
+- Uses the `@trpc/react-query` client and imports the `AppRouter` _type_ from `apps/api` — full end-to-end type safety, no codegen step.
 
 ### Local dev (`docker-compose.yml`)
 
@@ -214,7 +227,7 @@ Object storage is **AWS S3** (no local container) — bucket and IAM creds provi
 
 ### Phase 4 — Centralized outbound rate-limit gateway
 
-- Small Node service (or sidecar) fronting *all* outbound Voyage and Anthropic calls. Redis-backed token bucket per upstream API.
+- Small Node service (or sidecar) fronting _all_ outbound Voyage and Anthropic calls. Redis-backed token bucket per upstream API.
 - All workers route LLM/embedding traffic through it via a typed client in `packages/llm-clients/`.
 - Enables: cross-queue rate limit enforcement (BullMQ's limiter is per-queue, not per-API), circuit breakers, per-org cost caps, request prioritization, and centralized retry policy in one place.
 - This is the keystone for horizontal scale — without it, adding worker replicas violates upstream rate limits.
@@ -222,7 +235,7 @@ Object storage is **AWS S3** (no local container) — bucket and IAM creds provi
 ### Phase 5 — Production hardening
 
 - **Auth**: token-based, since the frontend is a static SPA — Clerk, Auth0, or Lucia/custom JWT (httpOnly cookie). Auth.js/NextAuth assumes a Next.js server, so it does not fit here. Token flows through tRPC context; relevant identifiers propagate to workers via the job payload.
-- **Multi-tenancy enforcement** at the API layer (schema already supports it). tRPC procedures touching the analysis side (`analyses.*`) scope by `ctx.orgId`; procedures touching the global library side do not. Phase 5 also decides whether library *administration* (`library.documents.create`) becomes admin-only or stays open — Phase 1 leaves it open.
+- **Multi-tenancy enforcement** at the API layer (schema already supports it). tRPC procedures touching the analysis side (`analyses.*`) scope by `ctx.orgId`; procedures touching the global library side do not. Phase 5 also decides whether library _administration_ (`library.documents.create`) becomes admin-only or stays open — Phase 1 leaves it open.
 - **PDF parsing sandbox**: isolate the parser in a worker process with restricted network/filesystem permissions, or graduate to a Python sidecar with no egress.
 - **Prompt-injection defenses**: delimiter-wrap suspect text in the judge prompt; pre-scan suspect text for known injection patterns; optionally pre-summarize suspect text through a separate Claude call so the judge never sees raw attacker-controlled tokens.
 - **OpenTelemetry** end-to-end traces (API → queue → worker → upstream API).
