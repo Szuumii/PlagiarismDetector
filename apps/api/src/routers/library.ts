@@ -3,7 +3,7 @@ import {
   ConfirmDocumentUploadResponseSchema,
   CreateDocumentInputSchema,
   CreateDocumentResponseSchema,
-  IndexDocumentJobSchema
+  IndexDocumentJobSchema,
 } from "@repo/schemas";
 
 import { TRPCError } from "@trpc/server";
@@ -37,9 +37,11 @@ export const libraryRouter = router({
       .input(ConfirmDocumentUploadInputSchema)
       .output(ConfirmDocumentUploadResponseSchema)
       .mutation(async ({ ctx, input }) => {
-        const documentId = input.documentId
+        const documentId = input.documentId;
 
-        const doc = await ctx.db.document.findUnique({ where: { id: documentId } })
+        const doc = await ctx.db.document.findUnique({
+          where: { id: documentId },
+        });
 
         if (!doc) {
           throw new TRPCError({
@@ -50,14 +52,15 @@ export const libraryRouter = router({
 
         const payload = IndexDocumentJobSchema.parse({
           documentId,
-          objectKey: doc.s3Key
-        })
+          objectKey: doc.s3Key,
+        });
 
         // TODO: Consider returning jobId from the return object, to ensure it's created
-        await ctx.queues.indexDocument.add('index', payload, { jobId: documentId })
+        await ctx.queues.indexDocument.add("index", payload, {
+          jobId: documentId,
+        });
 
-        return { enqueued: true, jobId: documentId }
-
-      })
+        return { enqueued: true, jobId: documentId };
+      }),
   }),
 });

@@ -10,7 +10,7 @@ export const appRouter = router({
     })),
   }),
   library: libraryRouter,
-  analyses: analysesRouter
+  analyses: analysesRouter,
 });
 
 // Only the *type* crosses the api → web boundary. web imports this with

@@ -1,11 +1,7 @@
 import { requireEnv } from "@repo/config/env";
 import { db } from "@repo/db";
 
-import {
-  analyzeSuspectQueue,
-  connection,
-  indexDocumentQueue,
-} from "./queues";
+import { analyzeSuspectQueue, connection, indexDocumentQueue } from "./queues";
 
 const orgId = requireEnv("DEFAULT_ORG_ID");
 
