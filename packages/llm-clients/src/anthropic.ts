@@ -1,54 +1,39 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { requireEnv } from "@repo/config/env";
+import { Output, generateText } from "ai";
+import type { z } from "zod";
 
 export const ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-6";
 export const ANTHROPIC_API_KEY = requireEnv("ANTHROPIC_API_KEY");
 
-const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+const anthropic = createAnthropic({ apiKey: ANTHROPIC_API_KEY });
 
-export interface CallToolArgs {
+export interface GenerateStructuredArgs<S extends z.ZodType> {
   systemPrompt: string;
   userMessage: string;
-  toolName: string;
-  toolDescription: string;
-  toolInputSchema: object;
+  schema: S;
+  schemaName?: string;
+  schemaDescription?: string;
 }
 
-export async function callTool(args: CallToolArgs): Promise<unknown> {
+export async function generateStructured<S extends z.ZodType>(
+  args: GenerateStructuredArgs<S>,
+): Promise<z.infer<S>> {
   const t0 = Date.now();
-  console.log(`[anthropic:fetch] firing tool=${args.toolName}`);
+  console.log(`[anthropic:fetch] firing schema=${args.schemaName ?? "object"}`);
 
-  const response = await client.messages.create({
-    model: ANTHROPIC_DEFAULT_MODEL,
-    max_tokens: 2000,
+  const { output } = await generateText({
+    model: anthropic(ANTHROPIC_DEFAULT_MODEL),
+    output: Output.object({
+      schema: args.schema,
+      name: args.schemaName,
+      description: args.schemaDescription,
+    }),
     system: args.systemPrompt,
-    messages: [{ role: "user", content: args.userMessage }],
-    tools: [
-      {
-        name: args.toolName,
-        description: args.toolDescription,
-        input_schema: args.toolInputSchema as Anthropic.Tool["input_schema"],
-      },
-    ],
-    tool_choice: { type: "tool", name: args.toolName },
+    prompt: args.userMessage,
+    maxOutputTokens: 2000,
   });
 
-  const elapsed = Date.now() - t0;
-
-  const block = response.content.find(
-    (b) => b.type === "tool_use" && b.name === args.toolName,
-  );
-
-  if (!block || block.type !== "tool_use") {
-    console.error(
-      `[anthropic:fetch] no tool_use block in response (elapsed=${elapsed}ms)`,
-      JSON.stringify(response.content),
-    );
-    throw new Error(
-      `anthropic: no tool_use block named "${args.toolName}" in response`,
-    );
-  }
-
-  console.log(`[anthropic:fetch] status=ok elapsed=${elapsed}ms`);
-  return block.input;
+  console.log(`[anthropic:fetch] status=ok elapsed=${Date.now() - t0}ms`);
+  return output as z.infer<S>;
 }

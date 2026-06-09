@@ -1,8 +1,5 @@
-import { callTool } from "@repo/llm-clients";
+import { generateStructured } from "@repo/llm-clients";
 import { type Verdict, VerdictSchema } from "@repo/schemas";
-
-const { $schema: _verdictSchemaDollarSchema, ...VERDICT_INPUT_SCHEMA } =
-  VerdictSchema.toJSONSchema({ reused: "inline" });
 
 export interface JudgeEvidencePair {
   suspectText: string;
@@ -27,22 +24,14 @@ export async function judge(input: JudgeInput): Promise<Verdict> {
     `[judge] candidate=${input.candidate.documentId} pairs=${input.candidate.evidencePairs.length}`,
   );
 
-  const result = await callTool({
+  return generateStructured({
     systemPrompt: JUDGE_SYSTEM_PROMPT,
     userMessage: buildJudgeUserMessage(input),
-    toolName: "report_verdict",
-    toolDescription:
+    schema: VerdictSchema,
+    schemaName: "report_verdict",
+    schemaDescription:
       "Emit a verdict for whether the suspect document derives from the presented candidate library document.",
-    toolInputSchema: VERDICT_INPUT_SCHEMA,
   });
-
-  const parsed = VerdictSchema.safeParse(result);
-  if (!parsed.success) {
-    throw new Error(
-      `judge: response failed validation. error=${parsed.error.message}`,
-    );
-  }
-  return parsed.data;
 }
 
 function buildJudgeUserMessage(input: JudgeInput): string {

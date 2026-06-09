@@ -19,8 +19,8 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.27.0",
     "@repo/db": "*",
+    "@repo/llm-clients": "*",
     "@repo/schemas": "*",
     "minisearch": "^7.1.0",
     "unpdf": "^1.6.2",
