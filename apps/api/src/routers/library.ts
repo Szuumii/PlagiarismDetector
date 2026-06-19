@@ -6,8 +6,9 @@ import {
   IndexDocumentJobSchema,
 } from "@repo/schemas";
 
+import { storage } from "@repo/storage";
 import { TRPCError } from "@trpc/server";
-import { libraryObjectKey, presignUploadUrl } from "@/s3";
+
 import { publicProcedure, router } from "@/trpc";
 
 export const libraryRouter = router({
@@ -17,7 +18,7 @@ export const libraryRouter = router({
       .output(CreateDocumentResponseSchema)
       .mutation(async ({ ctx, input }) => {
         const documentId = crypto.randomUUID();
-        const objectKey = libraryObjectKey(documentId);
+        const objectKey = storage.libraryObjectKey(documentId);
 
         await ctx.db.document.create({
           data: {
@@ -29,7 +30,7 @@ export const libraryRouter = router({
           },
         });
 
-        const { uploadUrl } = await presignUploadUrl({ key: objectKey });
+        const { uploadUrl } = await storage.presignUploadUrl({ key: objectKey });
 
         return { documentId, uploadUrl, objectKey };
       }),

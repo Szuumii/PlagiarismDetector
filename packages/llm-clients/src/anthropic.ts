@@ -1,6 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { requireEnv } from "@repo/config/env";
-import { Output, generateText } from "ai";
+import * as ai from "ai";
+import { wrapAISDK } from "langsmith/experimental/vercel";
 import type { z } from "zod";
 
 export const ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-6";
@@ -15,6 +16,8 @@ export interface GenerateStructuredArgs<S extends z.ZodType> {
   schemaName?: string;
   schemaDescription?: string;
 }
+
+const { generateText, Output } = wrapAISDK(ai)
 
 export async function generateStructured<S extends z.ZodType>(
   args: GenerateStructuredArgs<S>,

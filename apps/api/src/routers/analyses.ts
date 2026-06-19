@@ -7,9 +7,9 @@ import {
   GetAnalysisInputSchema,
   GetAnalysisResponseSchema,
 } from "@repo/schemas";
+import { storage } from "@repo/storage";
 import { TRPCError } from "@trpc/server";
 
-import { presignUploadUrl, suspectObjectKey } from "@/s3";
 import { publicProcedure, router } from "@/trpc";
 
 export const analysesRouter = router({
@@ -18,7 +18,7 @@ export const analysesRouter = router({
     .output(CreateAnalysisResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const suspectId = crypto.randomUUID();
-      const objectKey = suspectObjectKey(ctx.orgId, suspectId);
+      const objectKey = storage.suspectObjectKey(ctx.orgId, suspectId);
 
       await ctx.db.suspect.create({
         data: {
@@ -30,7 +30,7 @@ export const analysesRouter = router({
         },
       });
 
-      const { uploadUrl } = await presignUploadUrl({ key: objectKey });
+      const { uploadUrl } = await storage.presignUploadUrl({ key: objectKey });
 
       return { suspectId, uploadUrl, objectKey };
     }),

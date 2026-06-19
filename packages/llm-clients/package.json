@@ -21,7 +21,8 @@
     "@ai-sdk/anthropic": "^3.0.0",
     "@repo/config": "*",
     "@repo/schemas": "*",
-    "ai": "^6.0.0"
+    "ai": "^6.0.0",
+    "langsmith": "^0.7.10"
   },
   "devDependencies": {
     "typescript": "^5.5.0"
